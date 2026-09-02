@@ -3,7 +3,8 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Database } from '@/types/database'
-import { ShieldAlert, CheckCircle2, Clock, Trash2, Bot } from 'lucide-react'
+import { ShieldAlert, CheckCircle2, Clock, Trash2, Bot, RefreshCw } from 'lucide-react'
+import { essayQuestion } from '@/data/questions'
 
 type ExamRow = Database['public']['Tables']['exams']['Row']
 
@@ -13,6 +14,43 @@ export default function AdminDashboard() {
   const [isAuthenticated, setIsAuthenticated] = useState(false)
   const [password, setPassword] = useState('')
   const [authError, setAuthError] = useState('')
+  const [evaluatingId, setEvaluatingId] = useState<string | null>(null)
+
+  const handleReevaluate = async (exam: ExamRow) => {
+    if (!exam.essay_answer) {
+      alert("No essay answer saved for this student.")
+      return
+    }
+
+    setEvaluatingId(exam.id)
+    try {
+      const res = await fetch('/api/evaluate-essay', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({ essay: exam.essay_answer, prompt: essayQuestion.prompt })
+      })
+      const data = await res.json()
+      
+      const newScore = data.score ?? 0
+      const newFeedback = data.feedback ?? "Evaluation failed."
+
+      const { error } = await supabase
+        .from('exams')
+        .update({ ai_score: newScore, ai_feedback: newFeedback })
+        .eq('id', exam.id)
+
+      if (error) throw error
+
+      setExams(current => current.map(e => 
+        e.id === exam.id ? { ...e, ai_score: newScore, ai_feedback: newFeedback } : e
+      ))
+    } catch (e) {
+      console.error("Re-evaluation failed", e)
+      alert("Failed to re-evaluate the essay.")
+    } finally {
+      setEvaluatingId(null)
+    }
+  }
 
   const handleDelete = async (id: string) => {
     if (!confirm('Are you sure you want to delete this record?')) return
@@ -184,10 +222,23 @@ export default function AdminDashboard() {
                             
                             {exam.ai_score !== null && (
                               <div className="flex flex-col space-y-1 mt-2">
-                                <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-md bg-indigo-50 text-indigo-700 font-medium text-xs border border-indigo-100 w-fit">
-                                  <Bot className="w-3.5 h-3.5" />
-                                  <span>AI Score: {exam.ai_score}/10</span>
-                                </span>
+                                <div className="flex items-center space-x-2">
+                                  <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-md bg-indigo-50 text-indigo-700 font-medium text-xs border border-indigo-100 w-fit">
+                                    <Bot className="w-3.5 h-3.5" />
+                                    <span>AI Score: {exam.ai_score}/10</span>
+                                  </span>
+                                  {exam.ai_feedback?.includes("Error") && !exam.is_essay_pasted && (
+                                    <button 
+                                      onClick={() => handleReevaluate(exam)}
+                                      disabled={evaluatingId === exam.id}
+                                      className="text-xs flex items-center space-x-1 text-indigo-600 hover:text-indigo-800 disabled:opacity-50"
+                                      title="Retry AI Evaluation"
+                                    >
+                                      <RefreshCw className={`w-3 h-3 ${evaluatingId === exam.id ? 'animate-spin' : ''}`} />
+                                      <span>Retry</span>
+                                    </button>
+                                  )}
+                                </div>
                                 <p className="text-xs text-neutral-500 max-w-xs" title={exam.ai_feedback || ''}>
                                   {exam.ai_feedback}
                                 </p>
