@@ -70,6 +70,7 @@ export default function ResultPage() {
         
         if (error) {
           console.error('Error submitting exam:', error)
+          alert(`Database Error: ${error.message}. Please show this to the admin.`)
         }
       } catch (err) {
         console.error('Unexpected error:', err)
