@@ -31,6 +31,8 @@ export type Database = {
           is_essay_pasted?: boolean
           violation_count?: number
           created_at?: string
+          ai_feedback?: string | null
+          ai_score?: number | null
         }
         Update: {
           id?: string
@@ -41,6 +43,8 @@ export type Database = {
           is_essay_pasted?: boolean
           violation_count?: number
           created_at?: string
+          ai_feedback?: string | null
+          ai_score?: number | null
         }
       }
     }

@@ -36,6 +36,7 @@ export default function AdminDashboard() {
 
       const { error } = await supabase
         .from('exams')
+        // @ts-ignore
         .update({ ai_score: newScore, ai_feedback: newFeedback })
         .eq('id', exam.id)
 
