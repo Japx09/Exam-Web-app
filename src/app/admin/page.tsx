@@ -163,107 +163,115 @@ export default function AdminDashboard() {
             <span>Loading records...</span>
           </div>
         ) : (
-          <div className="bg-white border border-neutral-200 rounded-xl shadow-sm overflow-hidden">
-            <div className="overflow-x-auto">
-              <table className="w-full text-sm text-left">
-                <thead className="bg-neutral-50 border-b border-neutral-200 text-neutral-500 font-medium">
-                  <tr>
-                    <th className="px-6 py-4">Student Name</th>
-                    <th className="px-6 py-4">Section</th>
-                    <th className="px-6 py-4">MCQ Score</th>
-                    <th className="px-6 py-4">Violations (Alt-Tab)</th>
-                    <th className="px-6 py-4">Essay Status & AI</th>
-                    <th className="px-6 py-4 whitespace-nowrap">Submitted At</th>
-                    <th className="px-6 py-4 text-right">Actions</th>
-                  </tr>
-                </thead>
-                <tbody className="divide-y divide-neutral-100">
-                  {exams.length === 0 ? (
-                    <tr>
-                      <td colSpan={6} className="px-6 py-8 text-center text-neutral-500">
-                        No examination records found.
-                      </td>
-                    </tr>
-                  ) : (
-                    exams.map((exam) => (
-                      <tr key={exam.id} className="hover:bg-neutral-50 transition-colors">
-                        <td className="px-6 py-4 font-medium text-neutral-900">{exam.student_name}</td>
-                        <td className="px-6 py-4 text-neutral-600">{exam.section}</td>
-                        <td className="px-6 py-4">
-                          <span className={`inline-flex items-center px-2 py-1 rounded-md font-medium
-                            ${exam.mcq_score >= 20 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}
-                          `}>
-                            {exam.mcq_score} / 40
-                          </span>
-                        </td>
-                        <td className="px-6 py-4">
-                          {exam.violation_count > 0 ? (
-                            <span className="inline-flex items-center space-x-1 text-red-600 font-medium">
-                              <ShieldAlert className="w-4 h-4" />
-                              <span>{exam.violation_count}</span>
-                            </span>
+          <div className="space-y-8">
+            {['BSIT 2-A', 'BSIT 2-B'].map((section) => {
+              const sectionExams = exams.filter(e => e.section === section);
+              return (
+                <div key={section} className="flex flex-col space-y-3">
+                  <h2 className="text-lg font-semibold text-neutral-900 border-b border-neutral-200 pb-2">{section}</h2>
+                  <div className="bg-white border border-neutral-200 rounded-xl shadow-sm overflow-hidden">
+                    <div className="overflow-x-auto">
+                      <table className="w-full text-sm text-left">
+                        <thead className="bg-neutral-50 border-b border-neutral-200 text-neutral-500 font-medium">
+                          <tr>
+                            <th className="px-6 py-4">Student Name</th>
+                            <th className="px-6 py-4">MCQ Score</th>
+                            <th className="px-6 py-4">Violations (Alt-Tab)</th>
+                            <th className="px-6 py-4">Essay Status & AI</th>
+                            <th className="px-6 py-4 whitespace-nowrap">Submitted At</th>
+                            <th className="px-6 py-4 text-right">Actions</th>
+                          </tr>
+                        </thead>
+                        <tbody className="divide-y divide-neutral-100">
+                          {sectionExams.length === 0 ? (
+                            <tr>
+                              <td colSpan={6} className="px-6 py-8 text-center text-neutral-500">
+                                No examination records found for {section}.
+                              </td>
+                            </tr>
                           ) : (
-                            <span className="text-neutral-400">0</span>
-                          )}
-                        </td>
-                        <td className="px-6 py-4">
-                          <div className="flex flex-col space-y-2">
-                            {exam.is_essay_pasted ? (
-                              <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-md bg-red-50 text-red-700 font-medium text-xs border border-red-100 w-fit">
-                                <ShieldAlert className="w-3.5 h-3.5" />
-                                <span>Flagged (Pasted)</span>
-                              </span>
-                            ) : (
-                              <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-md bg-green-50 text-green-700 font-medium text-xs border border-green-100 w-fit">
-                                <CheckCircle2 className="w-3.5 h-3.5" />
-                                <span>Clean</span>
-                              </span>
-                            )}
-                            
-                            {exam.ai_score !== null && (
-                              <div className="flex flex-col space-y-1 mt-2">
-                                <div className="flex items-center space-x-2">
-                                  <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-md bg-indigo-50 text-indigo-700 font-medium text-xs border border-indigo-100 w-fit">
-                                    <Bot className="w-3.5 h-3.5" />
-                                    <span>AI Score: {exam.ai_score}/10</span>
+                            sectionExams.map((exam) => (
+                              <tr key={exam.id} className="hover:bg-neutral-50 transition-colors">
+                                <td className="px-6 py-4 font-medium text-neutral-900">{exam.student_name}</td>
+                                <td className="px-6 py-4">
+                                  <span className={`inline-flex items-center px-2 py-1 rounded-md font-medium
+                                    ${exam.mcq_score >= 20 ? 'bg-green-50 text-green-700' : 'bg-red-50 text-red-700'}
+                                  `}>
+                                    {exam.mcq_score} / 40
                                   </span>
-                                  {exam.ai_feedback?.includes("Error") && !exam.is_essay_pasted && (
-                                    <button 
-                                      onClick={() => handleReevaluate(exam)}
-                                      disabled={evaluatingId === exam.id}
-                                      className="text-xs flex items-center space-x-1 text-indigo-600 hover:text-indigo-800 disabled:opacity-50"
-                                      title="Retry AI Evaluation"
-                                    >
-                                      <RefreshCw className={`w-3 h-3 ${evaluatingId === exam.id ? 'animate-spin' : ''}`} />
-                                      <span>Retry</span>
-                                    </button>
+                                </td>
+                                <td className="px-6 py-4">
+                                  {exam.violation_count > 0 ? (
+                                    <span className="inline-flex items-center space-x-1 text-red-600 font-medium">
+                                      <ShieldAlert className="w-4 h-4" />
+                                      <span>{exam.violation_count}</span>
+                                    </span>
+                                  ) : (
+                                    <span className="text-neutral-400">0</span>
                                   )}
-                                </div>
-                                <p className="text-xs text-neutral-500 max-w-xs" title={exam.ai_feedback || ''}>
-                                  {exam.ai_feedback}
-                                </p>
-                              </div>
-                            )}
-                          </div>
-                        </td>
-                        <td className="px-6 py-4 text-neutral-500 whitespace-nowrap">
-                          {new Date(exam.created_at).toLocaleString()}
-                        </td>
-                        <td className="px-6 py-4 text-right">
-                          <button
-                            onClick={() => handleDelete(exam.id)}
-                            className="text-red-500 hover:text-red-700 p-2 rounded-md hover:bg-red-50 transition-colors"
-                            title="Delete Record"
-                          >
-                            <Trash2 className="w-4 h-4" />
-                          </button>
-                        </td>
-                      </tr>
-                    ))
-                  )}
-                </tbody>
-              </table>
-            </div>
+                                </td>
+                                <td className="px-6 py-4">
+                                  <div className="flex flex-col space-y-2">
+                                    {exam.is_essay_pasted ? (
+                                      <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-md bg-red-50 text-red-700 font-medium text-xs border border-red-100 w-fit">
+                                        <ShieldAlert className="w-3.5 h-3.5" />
+                                        <span>Flagged (Pasted)</span>
+                                      </span>
+                                    ) : (
+                                      <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-md bg-green-50 text-green-700 font-medium text-xs border border-green-100 w-fit">
+                                        <CheckCircle2 className="w-3.5 h-3.5" />
+                                        <span>Clean</span>
+                                      </span>
+                                    )}
+                                    
+                                    {exam.ai_score !== null && (
+                                      <div className="flex flex-col space-y-1 mt-2">
+                                        <div className="flex items-center space-x-2">
+                                          <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-md bg-indigo-50 text-indigo-700 font-medium text-xs border border-indigo-100 w-fit">
+                                            <Bot className="w-3.5 h-3.5" />
+                                            <span>AI Score: {exam.ai_score}/10</span>
+                                          </span>
+                                          {exam.ai_feedback?.includes("Error") && !exam.is_essay_pasted && (
+                                            <button 
+                                              onClick={() => handleReevaluate(exam)}
+                                              disabled={evaluatingId === exam.id}
+                                              className="text-xs flex items-center space-x-1 text-indigo-600 hover:text-indigo-800 disabled:opacity-50"
+                                              title="Retry AI Evaluation"
+                                            >
+                                              <RefreshCw className={`w-3 h-3 ${evaluatingId === exam.id ? 'animate-spin' : ''}`} />
+                                              <span>Retry</span>
+                                            </button>
+                                          )}
+                                        </div>
+                                        <p className="text-xs text-neutral-500 max-w-xs" title={exam.ai_feedback || ''}>
+                                          {exam.ai_feedback}
+                                        </p>
+                                      </div>
+                                    )}
+                                  </div>
+                                </td>
+                                <td className="px-6 py-4 text-neutral-500 whitespace-nowrap">
+                                  {new Date(exam.created_at).toLocaleString()}
+                                </td>
+                                <td className="px-6 py-4 text-right">
+                                  <button
+                                    onClick={() => handleDelete(exam.id)}
+                                    className="text-red-500 hover:text-red-700 p-2 rounded-md hover:bg-red-50 transition-colors"
+                                    title="Delete Record"
+                                  >
+                                    <Trash2 className="w-4 h-4" />
+                                  </button>
+                                </td>
+                              </tr>
+                            ))
+                          )}
+                        </tbody>
+                      </table>
+                    </div>
+                  </div>
+                </div>
+              );
+            })}
           </div>
         )}
       </div>
