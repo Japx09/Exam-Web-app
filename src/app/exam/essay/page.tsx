@@ -40,6 +40,11 @@ export default function EssayPage() {
   }
 
   const handleSubmit = () => {
+    if (!essay.trim() && !isPasted) {
+      alert("Please write your essay before submitting.")
+      return
+    }
+    
     sessionStorage.setItem('exam_essay_answer', essay)
     sessionStorage.setItem('exam_is_essay_pasted', isPasted.toString())
     sessionStorage.setItem('exam_violation_count', violationCount.toString())
@@ -106,7 +111,13 @@ export default function EssayPage() {
         <div className="pt-4 flex justify-end border-t border-neutral-100">
           <button
             onClick={handleSubmit}
-            className="flex items-center space-x-2 px-5 py-2.5 bg-neutral-900 text-white rounded-lg text-sm font-medium hover:bg-neutral-800 transition-colors"
+            disabled={!essay.trim() && !isPasted}
+            className={`flex items-center space-x-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-colors
+              ${(!essay.trim() && !isPasted) 
+                ? 'bg-neutral-200 text-neutral-400 cursor-not-allowed' 
+                : 'bg-neutral-900 text-white hover:bg-neutral-800'
+              }
+            `}
           >
             <span>Submit Exam</span>
             <Send className="w-4 h-4" />

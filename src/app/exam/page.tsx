@@ -13,6 +13,7 @@ export default function ExamPage() {
   const [score, setScore] = useState(0)
   const [timeLeft, setTimeLeft] = useState(60)
   const [selectedOption, setSelectedOption] = useState<string | null>(null)
+  const [shuffledQuestions, setShuffledQuestions] = useState<typeof questions>([])
   
   const handleAutoSubmit = () => {
     // Save current score
@@ -32,6 +33,10 @@ export default function ExamPage() {
       return
     }
     setName(studentName)
+    
+    // Shuffle questions on mount
+    const shuffled = [...questions].sort(() => Math.random() - 0.5)
+    setShuffledQuestions(shuffled)
     
     // We use a local state to ensure it doesn't get overwritten on re-renders,
     // though the final score is only what matters.
@@ -55,8 +60,14 @@ export default function ExamPage() {
   }, [timeLeft, name])
 
   const handleNext = () => {
+    // If no option is selected and there's still time left, don't allow next
+    if (!selectedOption && timeLeft > 0) {
+      alert("Please select an answer before proceeding.")
+      return
+    }
+
     // Check answer
-    const currentQ = questions[currentIndex]
+    const currentQ = shuffledQuestions[currentIndex]
     let newScore = score
     if (selectedOption === currentQ.answer) {
       newScore += 1
@@ -64,7 +75,7 @@ export default function ExamPage() {
       sessionStorage.setItem('exam_score', newScore.toString())
     }
 
-    if (currentIndex < questions.length - 1) {
+    if (currentIndex < shuffledQuestions.length - 1) {
       setCurrentIndex(prev => prev + 1)
       setSelectedOption(null)
       setTimeLeft(60)
@@ -75,9 +86,9 @@ export default function ExamPage() {
     }
   }
 
-  if (!name) return null // loading or redirecting
+  if (!name || shuffledQuestions.length === 0) return null // loading or redirecting
 
-  const currentQ = questions[currentIndex]
+  const currentQ = shuffledQuestions[currentIndex]
 
   return (
     <main className="flex-1 flex flex-col items-center justify-center p-6">
@@ -87,7 +98,7 @@ export default function ExamPage() {
         <div className="flex items-center justify-between border-b border-neutral-100 pb-4">
           <div className="flex items-center space-x-2">
             <span className="inline-flex items-center rounded-md bg-neutral-100 px-2 py-1 text-xs font-medium text-neutral-600 ring-1 ring-inset ring-neutral-500/10">
-              Question {currentIndex + 1} of {questions.length}
+              Question {currentIndex + 1} of {shuffledQuestions.length}
             </span>
             {violationCount > 0 && (
               <span className="inline-flex items-center space-x-1 rounded-md bg-red-50 px-2 py-1 text-xs font-medium text-red-700 ring-1 ring-inset ring-red-600/10">
@@ -132,9 +143,15 @@ export default function ExamPage() {
         <div className="pt-4 flex justify-end border-t border-neutral-100">
           <button
             onClick={handleNext}
-            className="flex items-center space-x-2 px-5 py-2.5 bg-neutral-900 text-white rounded-lg text-sm font-medium hover:bg-neutral-800 transition-colors"
+            disabled={!selectedOption && timeLeft > 0}
+            className={`flex items-center space-x-2 px-5 py-2.5 rounded-lg text-sm font-medium transition-colors
+              ${(!selectedOption && timeLeft > 0) 
+                ? 'bg-neutral-200 text-neutral-400 cursor-not-allowed' 
+                : 'bg-neutral-900 text-white hover:bg-neutral-800'
+              }
+            `}
           >
-            <span>{currentIndex === questions.length - 1 ? 'Proceed to Essay' : 'Next Question'}</span>
+            <span>{currentIndex === shuffledQuestions.length - 1 ? 'Proceed to Essay' : 'Next Question'}</span>
             <ChevronRight className="w-4 h-4" />
           </button>
         </div>

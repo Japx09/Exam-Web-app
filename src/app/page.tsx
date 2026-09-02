@@ -3,15 +3,34 @@
 import { useState } from 'react'
 import { useRouter } from 'next/navigation'
 import { ShieldCheck } from 'lucide-react'
+import { supabase } from '@/lib/supabase'
 
 export default function Onboarding() {
   const router = useRouter()
   const [name, setName] = useState('')
   const [section, setSection] = useState('BSIT 2-A')
+  const [errorMsg, setErrorMsg] = useState('')
 
   const handleStart = async (e: React.FormEvent) => {
     e.preventDefault()
     if (!name.trim()) return
+    
+    setErrorMsg('')
+
+    try {
+      const { data } = await supabase
+        .from('exams')
+        .select('id')
+        .ilike('student_name', name.trim())
+        .limit(1)
+
+      if (data && data.length > 0) {
+        setErrorMsg('You have already submitted an exam with this name.')
+        return
+      }
+    } catch (err) {
+      console.error(err)
+    }
 
     // Save to session storage
     sessionStorage.setItem('exam_student_name', name.trim())
@@ -75,6 +94,9 @@ export default function Onboarding() {
           >
             Start Examination
           </button>
+          {errorMsg && (
+            <p className="text-red-600 text-sm font-medium text-center mt-2">{errorMsg}</p>
+          )}
         </form>
         
         <div className="text-xs text-neutral-400 text-center mt-4 flex flex-col space-y-1">

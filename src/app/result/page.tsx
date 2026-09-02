@@ -4,6 +4,7 @@ import { useEffect, useState, useRef } from 'react'
 import { useRouter } from 'next/navigation'
 import { supabase } from '@/lib/supabase'
 import { CheckCircle, Clock } from 'lucide-react'
+import { essayQuestion } from '@/data/questions'
 
 export default function ResultPage() {
   const router = useRouter()
@@ -31,13 +32,38 @@ export default function ResultPage() {
 
     const submitExam = async () => {
       try {
+        let aiScore = null;
+        let aiFeedback = null;
+
+        if (essayAnswer && !isEssayPasted) {
+          try {
+            const res = await fetch('/api/evaluate-essay', {
+              method: 'POST',
+              headers: { 'Content-Type': 'application/json' },
+              body: JSON.stringify({ essay: essayAnswer, prompt: essayQuestion.prompt })
+            });
+            const data = await res.json();
+            aiScore = data.score ?? 0;
+            aiFeedback = data.feedback ?? "Evaluation failed.";
+          } catch (e) {
+            console.error("AI check failed", e);
+            aiScore = 0;
+            aiFeedback = "AI Evaluation Error";
+          }
+        } else if (isEssayPasted) {
+          aiScore = 0;
+          aiFeedback = "Flagged: Essay was copy-pasted.";
+        }
+
         const payload: any = {
           student_name: studentName,
           section: section,
           mcq_score: mcqScore,
           essay_answer: essayAnswer,
           is_essay_pasted: isEssayPasted,
-          violation_count: violationCount
+          violation_count: violationCount,
+          ai_score: aiScore,
+          ai_feedback: aiFeedback
         }
         
         const { error } = await supabase.from('exams').insert(payload)

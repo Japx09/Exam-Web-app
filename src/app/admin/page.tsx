@@ -3,13 +3,28 @@
 import { useEffect, useState } from 'react'
 import { supabase } from '@/lib/supabase'
 import { Database } from '@/types/database'
-import { ShieldAlert, CheckCircle2, Clock } from 'lucide-react'
+import { ShieldAlert, CheckCircle2, Clock, Trash2, Bot } from 'lucide-react'
 
 type ExamRow = Database['public']['Tables']['exams']['Row']
 
 export default function AdminDashboard() {
   const [exams, setExams] = useState<ExamRow[]>([])
   const [loading, setLoading] = useState(true)
+  const [isAuthenticated, setIsAuthenticated] = useState(false)
+  const [password, setPassword] = useState('')
+  const [authError, setAuthError] = useState('')
+
+  const handleDelete = async (id: string) => {
+    if (!confirm('Are you sure you want to delete this record?')) return
+    
+    const { error } = await supabase.from('exams').delete().eq('id', id)
+    if (error) {
+      console.error('Error deleting record:', error)
+      alert('Failed to delete record.')
+    } else {
+      setExams(current => current.filter(exam => exam.id !== id))
+    }
+  }
 
   useEffect(() => {
     const fetchExams = async () => {
@@ -41,6 +56,47 @@ export default function AdminDashboard() {
     }
   }, [])
 
+  if (!isAuthenticated) {
+    return (
+      <div className="min-h-screen bg-neutral-50 flex flex-col items-center justify-center p-6">
+        <div className="w-full max-w-sm bg-white border border-neutral-200 rounded-xl p-8 flex flex-col items-center space-y-6 shadow-sm">
+          <div className="space-y-1 text-center">
+            <h1 className="text-xl font-semibold text-neutral-900">Admin Access</h1>
+            <p className="text-sm text-neutral-500">Enter password to view records</p>
+          </div>
+          <form 
+            onSubmit={(e) => {
+              e.preventDefault();
+              if (password === 'nechama2026') {
+                setIsAuthenticated(true);
+                setAuthError('');
+              } else {
+                setAuthError('Incorrect password');
+              }
+            }}
+            className="w-full space-y-4"
+          >
+            <input
+              type="password"
+              value={password}
+              onChange={(e) => setPassword(e.target.value)}
+              placeholder="Password"
+              className="w-full px-4 py-2 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900"
+              autoFocus
+            />
+            {authError && <p className="text-red-500 text-xs font-medium text-center">{authError}</p>}
+            <button
+              type="submit"
+              className="w-full px-4 py-2 bg-neutral-900 text-white rounded-lg text-sm font-medium hover:bg-neutral-800 transition-colors focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:ring-offset-2"
+            >
+              Login
+            </button>
+          </form>
+        </div>
+      </div>
+    )
+  }
+
   return (
     <div className="min-h-screen bg-neutral-50 p-6 md:p-12">
       <div className="max-w-6xl mx-auto space-y-6">
@@ -71,8 +127,9 @@ export default function AdminDashboard() {
                     <th className="px-6 py-4">Section</th>
                     <th className="px-6 py-4">MCQ Score</th>
                     <th className="px-6 py-4">Violations (Alt-Tab)</th>
-                    <th className="px-6 py-4">Essay Status</th>
+                    <th className="px-6 py-4">Essay Status & AI</th>
                     <th className="px-6 py-4 whitespace-nowrap">Submitted At</th>
+                    <th className="px-6 py-4 text-right">Actions</th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100">
@@ -105,20 +162,43 @@ export default function AdminDashboard() {
                           )}
                         </td>
                         <td className="px-6 py-4">
-                          {exam.is_essay_pasted ? (
-                            <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-md bg-red-50 text-red-700 font-medium text-xs border border-red-100">
-                              <ShieldAlert className="w-3.5 h-3.5" />
-                              <span>Flagged (Pasted)</span>
-                            </span>
-                          ) : (
-                            <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-md bg-green-50 text-green-700 font-medium text-xs border border-green-100">
-                              <CheckCircle2 className="w-3.5 h-3.5" />
-                              <span>Clean</span>
-                            </span>
-                          )}
+                          <div className="flex flex-col space-y-2">
+                            {exam.is_essay_pasted ? (
+                              <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-md bg-red-50 text-red-700 font-medium text-xs border border-red-100 w-fit">
+                                <ShieldAlert className="w-3.5 h-3.5" />
+                                <span>Flagged (Pasted)</span>
+                              </span>
+                            ) : (
+                              <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-md bg-green-50 text-green-700 font-medium text-xs border border-green-100 w-fit">
+                                <CheckCircle2 className="w-3.5 h-3.5" />
+                                <span>Clean</span>
+                              </span>
+                            )}
+                            
+                            {exam.ai_score !== null && (
+                              <div className="flex flex-col space-y-1 mt-2">
+                                <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-md bg-indigo-50 text-indigo-700 font-medium text-xs border border-indigo-100 w-fit">
+                                  <Bot className="w-3.5 h-3.5" />
+                                  <span>AI Score: {exam.ai_score}/10</span>
+                                </span>
+                                <p className="text-xs text-neutral-500 max-w-xs" title={exam.ai_feedback || ''}>
+                                  {exam.ai_feedback}
+                                </p>
+                              </div>
+                            )}
+                          </div>
                         </td>
                         <td className="px-6 py-4 text-neutral-500 whitespace-nowrap">
                           {new Date(exam.created_at).toLocaleString()}
+                        </td>
+                        <td className="px-6 py-4 text-right">
+                          <button
+                            onClick={() => handleDelete(exam.id)}
+                            className="text-red-500 hover:text-red-700 p-2 rounded-md hover:bg-red-50 transition-colors"
+                            title="Delete Record"
+                          >
+                            <Trash2 className="w-4 h-4" />
+                          </button>
                         </td>
                       </tr>
                     ))
