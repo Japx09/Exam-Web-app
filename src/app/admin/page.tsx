@@ -27,6 +27,12 @@ export default function AdminDashboard() {
   }
 
   useEffect(() => {
+    if (sessionStorage.getItem('admin_auth') === 'true') {
+      setIsAuthenticated(true)
+    }
+  }, [])
+
+  useEffect(() => {
     const fetchExams = async () => {
       const { data, error } = await supabase
         .from('exams')
@@ -69,6 +75,7 @@ export default function AdminDashboard() {
               e.preventDefault();
               if (password === 'nechama2026') {
                 setIsAuthenticated(true);
+                sessionStorage.setItem('admin_auth', 'true');
                 setAuthError('');
               } else {
                 setAuthError('Incorrect password');
