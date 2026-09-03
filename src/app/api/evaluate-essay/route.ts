@@ -1,7 +1,7 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
 
-const ai = new GoogleGenAI({ apiKey: process.env.GEMINI_API_KEY });
+export const dynamic = 'force-dynamic';
 
 export async function POST(request: Request) {
   try {
@@ -10,6 +10,13 @@ export async function POST(request: Request) {
     if (!essay || !prompt) {
       return NextResponse.json({ error: 'Missing essay or prompt' }, { status: 400 });
     }
+
+    const apiKey = process.env.GEMINI_API_KEY;
+    if (!apiKey) {
+      return NextResponse.json({ error: 'GEMINI_API_KEY not configured' }, { status: 500 });
+    }
+
+    const ai = new GoogleGenAI({ apiKey });
 
     const systemInstruction = `
       You are a strict and objective exam evaluator checking a multimedia exam essay out of 10 points.
