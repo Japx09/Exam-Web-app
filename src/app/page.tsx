@@ -205,18 +205,13 @@ export default function Onboarding() {
       })
       const data = await res.json()
       if (!res.ok) {
-        setErrorMsg(data.error || 'Failed to validate school email.')
+        setErrorMsg(data.error || 'Failed to send verification code.')
         setSendingOtp(false)
         return
       }
 
-      await supabase.auth.signInWithOtp({
-        email: cleanLowerEmail,
-        options: { shouldCreateUser: true }
-      })
-
       setOtpSent(true)
-      setOtpHint(`Code sent to ${cleanLowerEmail}`)
+      setOtpHint(data.message || `6-digit code sent to ${cleanLowerEmail}`)
     } catch (err) {
       console.error(err)
       setErrorMsg('Could not send code. Please try again.')
@@ -248,33 +243,6 @@ export default function Onboarding() {
       })
 
       if (serverRes.ok) {
-        setIsEmailVerified(true)
-        setStep(3)
-        setVerifyingOtp(false)
-        return
-      }
-
-      // 2. Check Supabase Auth OTP (email or signup)
-      const { error: emailErr } = await supabase.auth.verifyOtp({
-        email: cleanLowerEmail,
-        token: cleanCode,
-        type: 'email'
-      })
-
-      if (!emailErr) {
-        setIsEmailVerified(true)
-        setStep(3)
-        setVerifyingOtp(false)
-        return
-      }
-
-      const { error: signupErr } = await supabase.auth.verifyOtp({
-        email: cleanLowerEmail,
-        token: cleanCode,
-        type: 'signup'
-      })
-
-      if (!signupErr) {
         setIsEmailVerified(true)
         setStep(3)
         setVerifyingOtp(false)
