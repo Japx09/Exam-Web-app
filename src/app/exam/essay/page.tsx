@@ -22,12 +22,13 @@ export default function EssayPage() {
   const [showToast, setShowToast] = useState(false)
 
   const buildFinalEssayString = () => {
+    const email = sessionStorage.getItem('exam_student_email') || undefined
     if (examType === 'MIDTERM') {
       const p1 = parseInt(sessionStorage.getItem('exam_part1_score') || '0', 10)
       const p2 = parseInt(sessionStorage.getItem('exam_part2_score') || '0', 10)
-      return formatMidtermEssayAnswer(p1, p2, essay1, essay2)
+      return formatMidtermEssayAnswer(p1, p2, essay1, essay2, email)
     }
-    return essay
+    return email ? `[EXAM:PRELIM|EMAIL:${email}]\n${essay}` : essay
   }
 
   const handleAutoSubmit = () => {

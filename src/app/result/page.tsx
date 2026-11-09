@@ -43,9 +43,14 @@ export default function ResultPage() {
     setPart1Score(p1Score)
     setPart2Score(p2Score)
 
+    const studentEmail = sessionStorage.getItem('exam_student_email') || ''
+    const emailTag = studentEmail ? `|EMAIL:${studentEmail.trim().toLowerCase()}` : ''
+
     // Ensure Midterm records always carry the [EXAM:MIDTERM] metadata prefix
     if (storedType === 'MIDTERM' && !essayAnswer.startsWith('[EXAM:MIDTERM')) {
-      essayAnswer = `[EXAM:MIDTERM|P1:${p1Score}/30|P2:${p2Score}/10]\n${essayAnswer}`
+      essayAnswer = `[EXAM:MIDTERM${emailTag}|P1:${p1Score}/30|P2:${p2Score}/10]\n${essayAnswer}`
+    } else if (storedType === 'PRELIM' && emailTag && !essayAnswer.startsWith('[EXAM:PRELIM')) {
+      essayAnswer = `[EXAM:PRELIM${emailTag}]\n${essayAnswer}`
     }
 
     const hasActualEssayContent =

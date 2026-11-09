@@ -709,33 +709,41 @@ export function parseExamDetails(exam: {
   section?: string | null
 }) {
   const isMidterm = isMidtermRecord(exam)
+  let displayEssay = exam.essay_answer || ''
+  let studentEmail: string | null = null
+
+  const emailMatch = displayEssay.match(/\|EMAIL:([^|\]]+)/i)
+  if (emailMatch) {
+    studentEmail = emailMatch[1].toLowerCase()
+  }
+
   if (!isMidterm) {
+    displayEssay = displayEssay.replace(/^\[EXAM:PRELIM[^\]]*\]\n*/, '')
     return {
       examType: 'PRELIM' as const,
+      studentEmail,
       part1Mcq: exam.mcq_score,
       part2Dnd: null as number | null,
       objectiveScore: exam.mcq_score,
       essayScore: exam.ai_score,
       totalScore: (exam.mcq_score || 0) + (exam.ai_score || 0),
-      displayEssay: exam.essay_answer || ''
+      displayEssay
     }
   }
 
   let part1Mcq: number | null = null
   let part2Dnd: number | null = null
-  let displayEssay = exam.essay_answer || ''
 
-  const match = displayEssay.match(/^\[EXAM:MIDTERM\|P1:(\d+)\/30\|P2:(\d+)\/10\]\n*/)
-  if (match) {
-    part1Mcq = parseInt(match[1], 10)
-    part2Dnd = parseInt(match[2], 10)
-    displayEssay = displayEssay.replace(match[0], '')
-  } else {
-    displayEssay = displayEssay.replace(/^\[EXAM:MIDTERM\]\n*/, '')
-  }
+  const p1Match = displayEssay.match(/\|P1:(\d+)\/30/)
+  const p2Match = displayEssay.match(/\|P2:(\d+)\/10/)
+  if (p1Match) part1Mcq = parseInt(p1Match[1], 10)
+  if (p2Match) part2Dnd = parseInt(p2Match[1], 10)
+
+  displayEssay = displayEssay.replace(/^\[EXAM:MIDTERM[^\]]*\]\n*/, '')
 
   return {
     examType: 'MIDTERM' as const,
+    studentEmail,
     part1Mcq,
     part2Dnd,
     objectiveScore: exam.mcq_score,
@@ -749,7 +757,10 @@ export function formatMidtermEssayAnswer(
   part1McqScore: number,
   part2DndScore: number,
   essay1: string,
-  essay2: string
+  essay2: string,
+  email?: string
 ): string {
-  return `[EXAM:MIDTERM|P1:${part1McqScore}/30|P2:${part2DndScore}/10]\n\n=== ESSAY 1: 60-Second UX Redesign Pitch ===\n${essay1.trim()}\n\n=== ESSAY 2: AI Briefing & Google Workspace Workflow ===\n${essay2.trim()}`
+  const emailTag = email ? `|EMAIL:${email.trim().toLowerCase()}` : ''
+  return `[EXAM:MIDTERM${emailTag}|P1:${part1McqScore}/30|P2:${part2DndScore}/10]\n\n=== ESSAY 1: 60-Second UX Redesign Pitch ===\n${essay1.trim()}\n\n=== ESSAY 2: AI Briefing & Google Workspace Workflow ===\n${essay2.trim()}`
 }
+

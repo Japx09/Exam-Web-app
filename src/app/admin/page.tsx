@@ -42,6 +42,35 @@ export default function AdminDashboard() {
   const [activeBuilderIdx, setActiveBuilderIdx] = useState(0)
   const [draggedBuilderElId, setDraggedBuilderElId] = useState<string | null>(null)
 
+  // Admin Backup OTP Lookup State
+  const [otpLookupName, setOtpLookupName] = useState('')
+  const [otpLookupEmail, setOtpLookupEmail] = useState('')
+  const [generatedBackupOtp, setGeneratedBackupOtp] = useState<string | null>(null)
+
+  const handleLookupOtp = async (e: React.FormEvent) => {
+    e.preventDefault()
+    if (!otpLookupName.trim() || !otpLookupEmail.trim()) return
+    try {
+      const res = await fetch('/api/otp', {
+        method: 'POST',
+        headers: { 'Content-Type': 'application/json' },
+        body: JSON.stringify({
+          action: 'admin_lookup',
+          name: otpLookupName.trim().toUpperCase(),
+          email: otpLookupEmail.trim().toLowerCase()
+        })
+      })
+      const data = await res.json()
+      if (data.otp) {
+        setGeneratedBackupOtp(data.otp)
+      } else {
+        alert(data.error || 'Could not generate OTP.')
+      }
+    } catch (err) {
+      console.error(err)
+    }
+  }
+
   const handleReevaluate = async (exam: ExamRow) => {
     if (!exam.essay_answer) {
       alert('No essay answer saved for this student.')
@@ -434,21 +463,58 @@ export default function AdminDashboard() {
           </div>
         ) : (
           <div className="space-y-8">
-            {/* Exam Filter Bar */}
-            <div className="flex items-center space-x-2">
-              {(['ALL', 'PRELIM', 'MIDTERM'] as const).map((filter) => (
+            {/* Classroom Backup OTP Generator + Exam Filter Bar */}
+            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white border border-neutral-200 rounded-xl p-4 shadow-2xs">
+              <div className="flex items-center space-x-2">
+                {(['ALL', 'PRELIM', 'MIDTERM'] as const).map((filter) => (
+                  <button
+                    key={filter}
+                    onClick={() => setExamFilter(filter)}
+                    className={`px-3.5 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${
+                      examFilter === filter
+                        ? 'bg-neutral-900 text-white'
+                        : 'bg-neutral-100 text-neutral-600 hover:text-neutral-900'
+                    }`}
+                  >
+                    {filter === 'ALL' ? 'All Exams' : `${filter} Only`}
+                  </button>
+                ))}
+              </div>
+
+              <form onSubmit={handleLookupOtp} className="flex flex-wrap items-center gap-2">
+                <span className="text-xs font-semibold text-neutral-600 mr-1">Backup Student OTP:</span>
+                <input
+                  type="text"
+                  value={otpLookupName}
+                  onChange={(e) => {
+                    setOtpLookupName(e.target.value.toUpperCase())
+                    setGeneratedBackupOtp(null)
+                  }}
+                  placeholder="STUDENT FULL NAME (CAPSLOCK)"
+                  className="px-2.5 py-1.5 border border-neutral-300 rounded-lg text-xs font-semibold uppercase w-48"
+                />
+                <input
+                  type="email"
+                  value={otpLookupEmail}
+                  onChange={(e) => {
+                    setOtpLookupEmail(e.target.value.toLowerCase())
+                    setGeneratedBackupOtp(null)
+                  }}
+                  placeholder="student@school.edu.ph"
+                  className="px-2.5 py-1.5 border border-neutral-300 rounded-lg text-xs w-48"
+                />
                 <button
-                  key={filter}
-                  onClick={() => setExamFilter(filter)}
-                  className={`px-3.5 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${
-                    examFilter === filter
-                      ? 'bg-neutral-900 text-white'
-                      : 'bg-white border border-neutral-200 text-neutral-600 hover:text-neutral-900'
-                  }`}
+                  type="submit"
+                  className="px-3 py-1.5 bg-neutral-900 text-white rounded-lg text-xs font-semibold hover:bg-neutral-800"
                 >
-                  {filter === 'ALL' ? 'All Exams' : `${filter} Only`}
+                  Get 6-Digit Code
                 </button>
-              ))}
+                {generatedBackupOtp && (
+                  <span className="px-3 py-1 bg-emerald-100 text-emerald-900 border border-emerald-300 rounded-lg text-xs font-mono font-bold tracking-widest">
+                    OTP: {generatedBackupOtp}
+                  </span>
+                )}
+              </form>
             </div>
 
             {['BSIT 2-A', 'BSIT 2-B'].map((section) => {
@@ -492,8 +558,15 @@ export default function AdminDashboard() {
                               const details = parseExamDetails(exam)
                               return (
                                 <tr key={exam.id} className="hover:bg-neutral-50 transition-colors">
-                                  <td className="px-6 py-4 font-bold text-neutral-900 uppercase">
-                                    {exam.student_name.toUpperCase()}
+                                  <td className="px-6 py-4">
+                                    <div className="font-bold text-neutral-900 uppercase">
+                                      {exam.student_name.toUpperCase()}
+                                    </div>
+                                    {details.studentEmail && (
+                                      <div className="text-xs text-neutral-400 font-normal lowercase">
+                                        {details.studentEmail}
+                                      </div>
+                                    )}
                                   </td>
                                   <td className="px-6 py-4">
                                     <span
