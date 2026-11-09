@@ -8,10 +8,7 @@ import {
   CheckCircle2,
   Clock,
   Trash2,
-  Bot,
   RefreshCw,
-  Layers,
-  Smartphone,
   Plus,
   GripVertical
 } from 'lucide-react'
@@ -35,7 +32,7 @@ export default function AdminDashboard() {
   const [authError, setAuthError] = useState('')
   const [evaluatingId, setEvaluatingId] = useState<string | null>(null)
   const [examFilter, setExamFilter] = useState<'ALL' | 'PRELIM' | 'MIDTERM'>('ALL')
-  const [adminView, setAdminView] = useState<'records' | 'builder'>('records')
+  const [adminView, setAdminView] = useState<'records' | 'builder' | 'otp'>('records')
 
   // Teacher Mode: Editable Wireframe Builder State
   const [builderChallenges, setBuilderChallenges] = useState<WireframeDndChallenge[]>(midtermWireframeChallenges)
@@ -159,7 +156,6 @@ export default function AdminDashboard() {
     }
   }, [])
 
-  // Teacher Builder Helpers
   const activeChallenge = builderChallenges[activeBuilderIdx]
 
   const updateElementField = (elId: string, field: keyof DraggableUIElement, value: string) => {
@@ -224,7 +220,7 @@ export default function AdminDashboard() {
   if (!isAuthenticated) {
     return (
       <div className="min-h-screen bg-neutral-50 flex flex-col items-center justify-center p-6">
-        <div className="w-full max-w-sm bg-white border border-neutral-200 rounded-xl p-8 flex flex-col items-center space-y-6 shadow-sm">
+        <div className="w-full max-w-sm bg-white border border-neutral-200 rounded-xl p-8 flex flex-col items-center space-y-6 shadow-xs">
           <div className="space-y-1 text-center">
             <h1 className="text-xl font-semibold text-neutral-900">Admin Access</h1>
             <p className="text-sm text-neutral-500">Enter password to view records</p>
@@ -253,7 +249,7 @@ export default function AdminDashboard() {
             {authError && <p className="text-red-500 text-xs font-medium text-center">{authError}</p>}
             <button
               type="submit"
-              className="w-full px-4 py-2 bg-neutral-900 text-white rounded-lg text-sm font-medium hover:bg-neutral-800 transition-colors focus:outline-none focus:ring-2 focus:ring-neutral-900 focus:ring-offset-2"
+              className="w-full px-4 py-2 bg-neutral-900 text-white rounded-lg text-sm font-medium hover:bg-neutral-800 transition-colors"
             >
               Login
             </button>
@@ -266,68 +262,125 @@ export default function AdminDashboard() {
   return (
     <div className="min-h-screen bg-neutral-50 p-6 md:p-12">
       <div className="max-w-6xl mx-auto space-y-6">
+        {/* Clean Minimal Header */}
         <header className="flex flex-col md:flex-row md:items-end justify-between border-b border-neutral-200 pb-6 gap-4">
           <div className="space-y-1">
-            <h1 className="text-3xl font-semibold tracking-tight text-neutral-900">Admin Dashboard</h1>
-            <p className="text-sm text-neutral-500">
-              Monitor Prelim & Midterm student examination records and configure Wireframe challenges.
-            </p>
+            <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Admin Dashboard</h1>
+            <p className="text-sm text-neutral-500">Monitor examination records and manage assessments.</p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            {/* Switch between Student Records and Teacher Wireframe Builder */}
-            <div className="flex items-center space-x-1 bg-neutral-200/70 p-1 rounded-xl">
+            <div className="flex items-center bg-neutral-100 p-1 rounded-lg border border-neutral-200/60">
               <button
                 onClick={() => setAdminView('records')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
                   adminView === 'records'
                     ? 'bg-white text-neutral-900 shadow-2xs'
                     : 'text-neutral-600 hover:text-neutral-900'
                 }`}
               >
-                Student Records ({exams.length})
+                Records ({exams.length})
+              </button>
+              <button
+                onClick={() => setAdminView('otp')}
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                  adminView === 'otp'
+                    ? 'bg-white text-neutral-900 shadow-2xs'
+                    : 'text-neutral-600 hover:text-neutral-900'
+                }`}
+              >
+                Student OTP
               </button>
               <button
                 onClick={() => setAdminView('builder')}
-                className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all flex items-center space-x-1 ${
+                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
                   adminView === 'builder'
                     ? 'bg-white text-neutral-900 shadow-2xs'
                     : 'text-neutral-600 hover:text-neutral-900'
                 }`}
               >
-                <Smartphone className="w-3.5 h-3.5" />
-                <span>Wireframe Builder (Teacher Mode)</span>
+                Wireframe Key
               </button>
-            </div>
-
-            <div className="flex items-center space-x-2 text-xs font-medium text-neutral-500 bg-white px-3 py-1.5 rounded-full border border-neutral-200">
-              <div className="w-2 h-2 rounded-full bg-green-500 animate-pulse" />
-              <span>Live Monitoring</span>
             </div>
           </div>
         </header>
 
-        {adminView === 'builder' ? (
-          /* TEACHER MODE: EDITABLE WIREFRAME DRAG & DROP BUILDER */
-          <div className="bg-white border border-neutral-200 rounded-2xl p-6 shadow-xs space-y-6">
+        {/* VIEW 1: BACKUP OTP GENERATOR */}
+        {adminView === 'otp' && (
+          <div className="max-w-md bg-white border border-neutral-200 rounded-xl p-6 shadow-xs space-y-4">
+            <div>
+              <h2 className="text-base font-semibold text-neutral-900">Student Backup OTP</h2>
+              <p className="text-xs text-neutral-500 mt-0.5">
+                Generate a student&apos;s 6-digit verification code if their school email delivery is delayed.
+              </p>
+            </div>
+            <form onSubmit={handleLookupOtp} className="space-y-3">
+              <div>
+                <label className="text-xs font-medium text-neutral-600 block mb-1">Full Name (CAPSLOCK)</label>
+                <input
+                  type="text"
+                  required
+                  value={otpLookupName}
+                  onChange={(e) => {
+                    setOtpLookupName(e.target.value.toUpperCase())
+                    setGeneratedBackupOtp(null)
+                  }}
+                  placeholder="JUAN A. DELA CRUZ"
+                  className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-xs font-semibold uppercase focus:outline-none focus:ring-2 focus:ring-neutral-900"
+                />
+              </div>
+              <div>
+                <label className="text-xs font-medium text-neutral-600 block mb-1">School Email (.edu.ph)</label>
+                <input
+                  type="email"
+                  required
+                  value={otpLookupEmail}
+                  onChange={(e) => {
+                    setOtpLookupEmail(e.target.value.toLowerCase())
+                    setGeneratedBackupOtp(null)
+                  }}
+                  placeholder="student@school.edu.ph"
+                  className="w-full px-3 py-2 border border-neutral-200 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-neutral-900"
+                />
+              </div>
+              <button
+                type="submit"
+                className="w-full py-2 bg-neutral-900 text-white rounded-lg text-xs font-medium hover:bg-neutral-800 transition-colors"
+              >
+                Generate 6-Digit Code
+              </button>
+            </form>
+
+            {generatedBackupOtp && (
+              <div className="p-3 bg-neutral-50 border border-neutral-200 rounded-lg flex items-center justify-between">
+                <span className="text-xs text-neutral-500">Verification Code:</span>
+                <span className="text-base font-mono font-bold tracking-widest text-neutral-900">
+                  {generatedBackupOtp}
+                </span>
+              </div>
+            )}
+          </div>
+        )}
+
+        {/* VIEW 2: TEACHER WIREFRAME BUILDER */}
+        {adminView === 'builder' && (
+          <div className="bg-white border border-neutral-200 rounded-xl p-6 shadow-xs space-y-6">
             <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-100 pb-4">
               <div>
-                <h2 className="text-lg font-bold text-neutral-900">
-                  Interactive Wireframe Question Builder (Teacher Mode)
-                </h2>
+                <h2 className="text-base font-semibold text-neutral-900">Wireframe Placement Answer Key</h2>
                 <p className="text-xs text-neutral-500">
-                  Inline-edit UI elements, change component types, and drag blocks into the Mobile Wireframe Canvas to set the Answer Key.
+                  Edit UI elements and drag blocks into the wireframe slots to configure the answer key.
                 </p>
               </div>
-              <div className="flex items-center space-x-1.5">
+              <div className="flex items-center space-x-1 bg-neutral-100 p-1 rounded-lg">
                 {builderChallenges.map((ch, idx) => (
                   <button
                     key={ch.id}
                     onClick={() => setActiveBuilderIdx(idx)}
-                    className={`px-3 py-1.5 rounded-lg text-xs font-semibold transition-all ${
+                    className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
                       activeBuilderIdx === idx
-                        ? 'bg-neutral-900 text-white'
-                        : 'bg-neutral-100 text-neutral-600 hover:bg-neutral-200'
+                        ? 'bg-white text-neutral-900 shadow-2xs'
+                        : 'text-neutral-600 hover:text-neutral-900'
                     }`}
                   >
                     Challenge {idx + 1}
@@ -337,23 +390,20 @@ export default function AdminDashboard() {
             </div>
 
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
-              {/* Editable Palette */}
               <div className="lg:col-span-7 space-y-3">
                 <div className="flex items-center justify-between">
-                  <span className="text-xs font-bold uppercase tracking-wider text-neutral-600">
-                    Draggable UI Blocks (Palette & Distractors)
-                  </span>
+                  <span className="text-xs font-medium text-neutral-500">Draggable UI Blocks</span>
                   <button
                     type="button"
                     onClick={addDraggableElement}
-                    className="inline-flex items-center space-x-1 text-xs font-semibold bg-neutral-900 text-white px-3 py-1.5 rounded-lg hover:bg-neutral-800"
+                    className="inline-flex items-center space-x-1 text-xs font-medium bg-neutral-900 text-white px-2.5 py-1.5 rounded-lg hover:bg-neutral-800"
                   >
                     <Plus className="w-3.5 h-3.5" />
-                    <span>Add UI Block</span>
+                    <span>Add Block</span>
                   </button>
                 </div>
 
-                <div className="space-y-2.5">
+                <div className="space-y-2">
                   {activeChallenge.draggableElements.map((el) => {
                     const assignedSlot = activeChallenge.dropZones.find((z) => z.correctElementId === el.id)
                     return (
@@ -361,39 +411,32 @@ export default function AdminDashboard() {
                         key={el.id}
                         draggable
                         onDragStart={() => setDraggedBuilderElId(el.id)}
-                        className="p-3 rounded-xl border border-neutral-200 bg-neutral-50/60 flex flex-col space-y-2 cursor-grab active:cursor-grabbing"
+                        className="p-3 rounded-lg border border-neutral-200 bg-neutral-50/50 flex flex-col space-y-2 cursor-grab"
                       >
                         <div className="flex items-center justify-between gap-2">
                           <div className="flex items-center space-x-2">
-                            <GripVertical className="w-4 h-4 text-neutral-400" />
-                            <span className="text-xs font-bold text-neutral-800">{el.code}</span>
+                            <GripVertical className="w-3.5 h-3.5 text-neutral-400" />
+                            <span className="text-xs font-semibold text-neutral-700">{el.code}</span>
                             <select
                               value={el.uiType}
                               onChange={(e) => updateElementField(el.id, 'uiType', e.target.value)}
-                              className="text-xs bg-white border border-neutral-300 rounded px-2 py-0.5 font-medium text-neutral-700"
+                              className="text-xs bg-white border border-neutral-200 rounded px-2 py-0.5 text-neutral-700"
                             >
-                              <option value="badge">Header / Status Badge</option>
-                              <option value="textbox">Text Box / Input Field</option>
-                              <option value="button">Primary / Action Button</option>
-                              <option value="card">Confirmation / Menu Card</option>
+                              <option value="badge">Badge</option>
+                              <option value="textbox">Textbox</option>
+                              <option value="button">Button</option>
+                              <option value="card">Card</option>
                             </select>
                           </div>
 
                           <div className="flex items-center space-x-2">
-                            {assignedSlot ? (
-                              <span className="text-[11px] font-semibold bg-emerald-100 text-emerald-800 px-2 py-0.5 rounded-full">
-                                Answer Key: Slot #{assignedSlot.slotNumber}
-                              </span>
-                            ) : (
-                              <span className="text-[11px] font-medium bg-amber-100 text-amber-800 px-2 py-0.5 rounded-full">
-                                Distractor / Clutter
-                              </span>
-                            )}
+                            <span className="text-[11px] font-medium text-neutral-500">
+                              {assignedSlot ? `Slot #${assignedSlot.slotNumber}` : 'Distractor'}
+                            </span>
                             <button
                               type="button"
                               onClick={() => removeDraggableElement(el.id)}
                               className="text-neutral-400 hover:text-red-600 p-1"
-                              title="Delete block"
                             >
                               <Trash2 className="w-3.5 h-3.5" />
                             </button>
@@ -404,7 +447,7 @@ export default function AdminDashboard() {
                           type="text"
                           value={el.label}
                           onChange={(e) => updateElementField(el.id, 'label', e.target.value)}
-                          className="w-full px-3 py-1.5 text-xs font-medium bg-white border border-neutral-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-neutral-900"
+                          className="w-full px-2.5 py-1.5 text-xs bg-white border border-neutral-200 rounded-md focus:outline-none focus:ring-1 focus:ring-neutral-900"
                         />
                       </div>
                     )
@@ -412,274 +455,216 @@ export default function AdminDashboard() {
                 </div>
               </div>
 
-              {/* Answer Key Wireframe Canvas */}
-              <div className="lg:col-span-5 flex flex-col items-center">
-                <div className="w-full max-w-sm bg-neutral-900 rounded-4xl p-3 border-4 border-neutral-800 shadow-md">
-                  <div className="bg-neutral-50 rounded-3xl p-4 space-y-3">
-                    <div className="text-xs font-bold text-neutral-700 border-b border-neutral-200 pb-2 flex items-center justify-between">
-                      <span>Answer Key Drop Zones</span>
-                      <span className="text-[11px] text-neutral-400">Drag block here to set key</span>
-                    </div>
-
-                    {activeChallenge.dropZones.map((zone) => {
-                      const keyEl = activeChallenge.draggableElements.find(
-                        (e) => e.id === zone.correctElementId
-                      )
-                      return (
-                        <div
-                          key={zone.slotId}
-                          onDragOver={(e) => e.preventDefault()}
-                          onDrop={(e) => {
-                            e.preventDefault()
-                            if (draggedBuilderElId) {
-                              setAnswerKeyForSlot(zone.slotId, draggedBuilderElId)
-                              setDraggedBuilderElId(null)
-                            }
-                          }}
-                          className="p-3 rounded-xl bg-white border-2 border-neutral-300 space-y-1.5"
-                        >
-                          <div className="text-[11px] font-bold uppercase text-neutral-500">
-                            {zone.slotLabel}
-                          </div>
-                          {keyEl ? (
-                            <div className="p-2 rounded-lg bg-emerald-50 border border-emerald-200 text-xs font-semibold text-emerald-950">
-                              [{keyEl.code}] {keyEl.label}
-                            </div>
-                          ) : (
-                            <div className="text-xs text-neutral-400 italic">No answer key assigned</div>
-                          )}
-                        </div>
-                      )
-                    })}
+              <div className="lg:col-span-5">
+                <div className="bg-neutral-50 rounded-xl p-4 border border-neutral-200 space-y-3">
+                  <div className="text-xs font-semibold text-neutral-700 border-b border-neutral-200 pb-2">
+                    Target Wireframe Slots
                   </div>
+
+                  {activeChallenge.dropZones.map((zone) => {
+                    const keyEl = activeChallenge.draggableElements.find(
+                      (e) => e.id === zone.correctElementId
+                    )
+                    return (
+                      <div
+                        key={zone.slotId}
+                        onDragOver={(e) => e.preventDefault()}
+                        onDrop={(e) => {
+                          e.preventDefault()
+                          if (draggedBuilderElId) {
+                            setAnswerKeyForSlot(zone.slotId, draggedBuilderElId)
+                            setDraggedBuilderElId(null)
+                          }
+                        }}
+                        className="p-3 rounded-lg bg-white border border-neutral-200 space-y-1"
+                      >
+                        <div className="text-[11px] font-medium text-neutral-500">{zone.slotLabel}</div>
+                        {keyEl ? (
+                          <div className="text-xs font-semibold text-neutral-900">
+                            [{keyEl.code}] {keyEl.label}
+                          </div>
+                        ) : (
+                          <div className="text-xs text-neutral-400">Unassigned</div>
+                        )}
+                      </div>
+                    )
+                  })}
                 </div>
               </div>
             </div>
           </div>
-        ) : loading ? (
-          <div className="flex items-center justify-center p-12 text-neutral-500">
-            <Clock className="w-5 h-5 animate-spin mr-2" />
-            <span>Loading records...</span>
-          </div>
-        ) : (
-          <div className="space-y-8">
-            {/* Classroom Backup OTP Generator + Exam Filter Bar */}
-            <div className="flex flex-col lg:flex-row lg:items-center justify-between gap-4 bg-white border border-neutral-200 rounded-xl p-4 shadow-2xs">
-              <div className="flex items-center space-x-2">
+        )}
+
+        {/* VIEW 3: STUDENT RECORDS */}
+        {adminView === 'records' &&
+          (loading ? (
+            <div className="flex items-center justify-center p-12 text-neutral-500">
+              <Clock className="w-4 h-4 animate-spin mr-2" />
+              <span className="text-sm">Loading records...</span>
+            </div>
+          ) : (
+            <div className="space-y-6">
+              {/* Minimal Period Filter */}
+              <div className="flex items-center space-x-1 bg-neutral-100 p-1 rounded-lg w-fit border border-neutral-200/60">
                 {(['ALL', 'PRELIM', 'MIDTERM'] as const).map((filter) => (
                   <button
                     key={filter}
                     onClick={() => setExamFilter(filter)}
-                    className={`px-3.5 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${
+                    className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
                       examFilter === filter
-                        ? 'bg-neutral-900 text-white'
-                        : 'bg-neutral-100 text-neutral-600 hover:text-neutral-900'
+                        ? 'bg-white text-neutral-900 shadow-2xs'
+                        : 'text-neutral-600 hover:text-neutral-900'
                     }`}
                   >
-                    {filter === 'ALL' ? 'All Exams' : `${filter} Only`}
+                    {filter === 'ALL' ? 'All Exams' : filter === 'PRELIM' ? 'Prelim' : 'Midterm'}
                   </button>
                 ))}
               </div>
 
-              <form onSubmit={handleLookupOtp} className="flex flex-wrap items-center gap-2">
-                <span className="text-xs font-semibold text-neutral-600 mr-1">Backup Student OTP:</span>
-                <input
-                  type="text"
-                  value={otpLookupName}
-                  onChange={(e) => {
-                    setOtpLookupName(e.target.value.toUpperCase())
-                    setGeneratedBackupOtp(null)
-                  }}
-                  placeholder="STUDENT FULL NAME (CAPSLOCK)"
-                  className="px-2.5 py-1.5 border border-neutral-300 rounded-lg text-xs font-semibold uppercase w-48"
-                />
-                <input
-                  type="email"
-                  value={otpLookupEmail}
-                  onChange={(e) => {
-                    setOtpLookupEmail(e.target.value.toLowerCase())
-                    setGeneratedBackupOtp(null)
-                  }}
-                  placeholder="student@school.edu.ph"
-                  className="px-2.5 py-1.5 border border-neutral-300 rounded-lg text-xs w-48"
-                />
-                <button
-                  type="submit"
-                  className="px-3 py-1.5 bg-neutral-900 text-white rounded-lg text-xs font-semibold hover:bg-neutral-800"
-                >
-                  Get 6-Digit Code
-                </button>
-                {generatedBackupOtp && (
-                  <span className="px-3 py-1 bg-emerald-100 text-emerald-900 border border-emerald-300 rounded-lg text-xs font-mono font-bold tracking-widest">
-                    OTP: {generatedBackupOtp}
-                  </span>
-                )}
-              </form>
-            </div>
+              {['BSIT 2-A', 'BSIT 2-B'].map((section) => {
+                const sectionExams = exams.filter((e) => {
+                  if (e.section !== section) return false
+                  if (examFilter === 'ALL') return true
+                  const isMidterm = isMidtermRecord(e)
+                  return examFilter === 'MIDTERM' ? isMidterm : !isMidterm
+                })
 
-            {['BSIT 2-A', 'BSIT 2-B'].map((section) => {
-              const sectionExams = exams.filter((e) => {
-                if (e.section !== section) return false
-                if (examFilter === 'ALL') return true
-                const isMidterm = isMidtermRecord(e)
-                return examFilter === 'MIDTERM' ? isMidterm : !isMidterm
-              })
+                return (
+                  <div key={section} className="flex flex-col space-y-3">
+                    <div className="flex items-center justify-between border-b border-neutral-200 pb-2">
+                      <h2 className="text-base font-semibold text-neutral-900">{section}</h2>
+                      <span className="text-xs text-neutral-500">{sectionExams.length} records</span>
+                    </div>
 
-              return (
-                <div key={section} className="flex flex-col space-y-3">
-                  <div className="flex items-center justify-between border-b border-neutral-200 pb-2">
-                    <h2 className="text-lg font-semibold text-neutral-900">{section}</h2>
-                    <span className="text-xs font-medium text-neutral-500">{sectionExams.length} records</span>
-                  </div>
-                  <div className="bg-white border border-neutral-200 rounded-xl shadow-sm overflow-hidden">
-                    <div className="overflow-x-auto">
-                      <table className="w-full text-sm text-left">
-                        <thead className="bg-neutral-50 border-b border-neutral-200 text-neutral-500 font-medium">
-                          <tr>
-                            <th className="px-6 py-4">Student Name (CAPSLOCK)</th>
-                            <th className="px-6 py-4">Exam Type</th>
-                            <th className="px-6 py-4">Objective (/40)</th>
-                            <th className="px-6 py-4">Violations</th>
-                            <th className="px-6 py-4">Essay Status & AI (/10)</th>
-                            <th className="px-6 py-4">Total (/50)</th>
-                            <th className="px-6 py-4 whitespace-nowrap">Submitted At</th>
-                            <th className="px-6 py-4 text-right">Actions</th>
-                          </tr>
-                        </thead>
-                        <tbody className="divide-y divide-neutral-100">
-                          {sectionExams.length === 0 ? (
+                    <div className="bg-white border border-neutral-200 rounded-xl shadow-xs overflow-hidden">
+                      <div className="overflow-x-auto">
+                        <table className="w-full text-sm text-left">
+                          <thead className="bg-neutral-50 border-b border-neutral-200 text-neutral-500 text-xs font-medium">
                             <tr>
-                              <td colSpan={8} className="px-6 py-8 text-center text-neutral-500">
-                                No examination records found for {section}.
-                              </td>
+                              <th className="px-5 py-3.5">Student Name</th>
+                              <th className="px-5 py-3.5">Period</th>
+                              <th className="px-5 py-3.5">Objective</th>
+                              <th className="px-5 py-3.5">Essay (AI)</th>
+                              <th className="px-5 py-3.5">Total</th>
+                              <th className="px-5 py-3.5">Violations</th>
+                              <th className="px-5 py-3.5 whitespace-nowrap">Submitted</th>
+                              <th className="px-5 py-3.5 text-right">Action</th>
                             </tr>
-                          ) : (
-                            sectionExams.map((exam) => {
-                              const details = parseExamDetails(exam)
-                              return (
-                                <tr key={exam.id} className="hover:bg-neutral-50 transition-colors">
-                                  <td className="px-6 py-4">
-                                    <div className="font-bold text-neutral-900 uppercase">
-                                      {exam.student_name.toUpperCase()}
-                                    </div>
-                                    {details.studentEmail && (
-                                      <div className="text-xs text-neutral-400 font-normal lowercase">
-                                        {details.studentEmail}
+                          </thead>
+                          <tbody className="divide-y divide-neutral-100">
+                            {sectionExams.length === 0 ? (
+                              <tr>
+                                <td colSpan={8} className="px-6 py-8 text-center text-neutral-400 text-xs">
+                                  No examination records found for {section}.
+                                </td>
+                              </tr>
+                            ) : (
+                              sectionExams.map((exam) => {
+                                const details = parseExamDetails(exam)
+                                return (
+                                  <tr key={exam.id} className="hover:bg-neutral-50/80 transition-colors">
+                                    <td className="px-5 py-3.5">
+                                      <div className="font-medium text-neutral-900 uppercase text-xs sm:text-sm">
+                                        {exam.student_name.toUpperCase()}
                                       </div>
-                                    )}
-                                  </td>
-                                  <td className="px-6 py-4">
-                                    <span
-                                      className={`inline-flex items-center px-2.5 py-0.5 rounded text-xs font-bold uppercase ${
-                                        details.examType === 'MIDTERM'
-                                          ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
-                                          : 'bg-neutral-100 text-neutral-700 border border-neutral-200'
-                                      }`}
-                                    >
-                                      {details.examType}
-                                    </span>
-                                  </td>
-                                  <td className="px-6 py-4">
-                                    <div className="flex flex-col space-y-1">
+                                      {details.studentEmail && (
+                                        <div className="text-[11px] text-neutral-400 lowercase">
+                                          {details.studentEmail}
+                                        </div>
+                                      )}
+                                    </td>
+                                    <td className="px-5 py-3.5">
+                                      <span className="inline-flex px-2 py-0.5 rounded text-[11px] font-medium bg-neutral-100 text-neutral-700">
+                                        {details.examType}
+                                      </span>
+                                    </td>
+                                    <td className="px-5 py-3.5">
+                                      <div className="font-medium text-neutral-900">{exam.mcq_score} / 40</div>
+                                      {details.examType === 'MIDTERM' && details.part1Mcq !== null && (
+                                        <div className="text-[11px] text-neutral-400">
+                                          {details.part1Mcq} MCQ • {details.part2Dnd} UI
+                                        </div>
+                                      )}
+                                    </td>
+                                    <td className="px-5 py-3.5">
+                                      <div className="flex flex-col space-y-1 max-w-xs">
+                                        <div className="flex items-center space-x-2">
+                                          <span className="font-medium text-neutral-900">
+                                            {exam.ai_score ?? 0} / 10
+                                          </span>
+                                          {exam.is_essay_pasted ? (
+                                            <span className="text-[11px] text-red-600 font-medium">Pasted</span>
+                                          ) : (
+                                            <button
+                                              onClick={() => handleReevaluate(exam)}
+                                              disabled={evaluatingId === exam.id}
+                                              className="text-[11px] text-neutral-400 hover:text-neutral-900 flex items-center space-x-1 disabled:opacity-50"
+                                              title="Re-evaluate Essay"
+                                            >
+                                              <RefreshCw
+                                                className={`w-3 h-3 ${
+                                                  evaluatingId === exam.id ? 'animate-spin' : ''
+                                                }`}
+                                              />
+                                            </button>
+                                          )}
+                                        </div>
+                                        {exam.ai_feedback && (
+                                          <p
+                                            className="text-[11px] text-neutral-500 line-clamp-1"
+                                            title={exam.ai_feedback}
+                                          >
+                                            {exam.ai_feedback}
+                                          </p>
+                                        )}
+                                      </div>
+                                    </td>
+                                    <td className="px-5 py-3.5">
                                       <span
-                                        className={`inline-flex items-center px-2 py-1 rounded-md font-medium w-fit ${
-                                          exam.mcq_score >= 20
+                                        className={`inline-flex px-2 py-0.5 rounded text-xs font-semibold ${
+                                          details.totalScore >= 25
                                             ? 'bg-green-50 text-green-700'
                                             : 'bg-red-50 text-red-700'
                                         }`}
                                       >
-                                        {exam.mcq_score} / 40
+                                        {details.totalScore} / 50
                                       </span>
-                                      {details.examType === 'MIDTERM' && details.part1Mcq !== null && (
-                                        <span className="text-[11px] text-neutral-500">
-                                          MCQ: {details.part1Mcq}/30 • Wireframe: {details.part2Dnd}/10
-                                        </span>
-                                      )}
-                                    </div>
-                                  </td>
-                                  <td className="px-6 py-4">
-                                    {exam.violation_count > 0 ? (
-                                      <span className="inline-flex items-center space-x-1 text-red-600 font-medium">
-                                        <ShieldAlert className="w-4 h-4" />
-                                        <span>{exam.violation_count}</span>
-                                      </span>
-                                    ) : (
-                                      <span className="text-neutral-400">0</span>
-                                    )}
-                                  </td>
-                                  <td className="px-6 py-4">
-                                    <div className="flex flex-col space-y-2">
-                                      {exam.is_essay_pasted ? (
-                                        <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-md bg-red-50 text-red-700 font-medium text-xs border border-red-100 w-fit">
+                                    </td>
+                                    <td className="px-5 py-3.5">
+                                      {exam.violation_count > 0 ? (
+                                        <span className="inline-flex items-center space-x-1 text-red-600 text-xs font-medium">
                                           <ShieldAlert className="w-3.5 h-3.5" />
-                                          <span>Flagged (Pasted)</span>
+                                          <span>{exam.violation_count}</span>
                                         </span>
                                       ) : (
-                                        <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-md bg-green-50 text-green-700 font-medium text-xs border border-green-100 w-fit">
-                                          <CheckCircle2 className="w-3.5 h-3.5" />
-                                          <span>Clean</span>
-                                        </span>
+                                        <span className="text-neutral-400 text-xs">0</span>
                                       )}
-
-                                      {exam.ai_score !== null && (
-                                        <div className="flex flex-col space-y-1 mt-1">
-                                          <div className="flex items-center space-x-2">
-                                            <span className="inline-flex items-center space-x-1 px-2.5 py-1 rounded-md bg-indigo-50 text-indigo-700 font-medium text-xs border border-indigo-100 w-fit">
-                                              <Bot className="w-3.5 h-3.5" />
-                                              <span>AI Score: {exam.ai_score}/10</span>
-                                            </span>
-                                            {!exam.is_essay_pasted && (
-                                              <button
-                                                onClick={() => handleReevaluate(exam)}
-                                                disabled={evaluatingId === exam.id}
-                                                className="text-xs flex items-center space-x-1 text-indigo-600 hover:text-indigo-800 disabled:opacity-50"
-                                                title="Re-evaluate Essay with AI"
-                                              >
-                                                <RefreshCw
-                                                  className={`w-3 h-3 ${evaluatingId === exam.id ? 'animate-spin' : ''}`}
-                                                />
-                                                <span>Re-grade</span>
-                                              </button>
-                                            )}
-                                          </div>
-                                          <p
-                                            className="text-xs text-neutral-500 max-w-xs line-clamp-2"
-                                            title={exam.ai_feedback || ''}
-                                          >
-                                            {exam.ai_feedback}
-                                          </p>
-                                        </div>
-                                      )}
-                                    </div>
-                                  </td>
-                                  <td className="px-6 py-4 font-bold text-neutral-900">
-                                    {details.totalScore} / 50
-                                  </td>
-                                  <td className="px-6 py-4 text-neutral-500 whitespace-nowrap text-xs">
-                                    {new Date(exam.created_at).toLocaleString()}
-                                  </td>
-                                  <td className="px-6 py-4 text-right">
-                                    <button
-                                      onClick={() => handleDelete(exam.id)}
-                                      className="text-red-500 hover:text-red-700 p-2 rounded-md hover:bg-red-50 transition-colors"
-                                      title="Delete Record"
-                                    >
-                                      <Trash2 className="w-4 h-4" />
-                                    </button>
-                                  </td>
-                                </tr>
-                              )
-                            })
-                          )}
-                        </tbody>
-                      </table>
+                                    </td>
+                                    <td className="px-5 py-3.5 text-neutral-400 whitespace-nowrap text-xs">
+                                      {new Date(exam.created_at).toLocaleDateString()}
+                                    </td>
+                                    <td className="px-5 py-3.5 text-right">
+                                      <button
+                                        onClick={() => handleDelete(exam.id)}
+                                        className="text-neutral-400 hover:text-red-600 p-1.5 rounded-md hover:bg-red-50 transition-colors"
+                                        title="Delete Record"
+                                      >
+                                        <Trash2 className="w-4 h-4" />
+                                      </button>
+                                    </td>
+                                  </tr>
+                                )
+                              })
+                            )}
+                          </tbody>
+                        </table>
+                      </div>
                     </div>
                   </div>
-                </div>
-              )
-            })}
-          </div>
-        )}
+                )
+              })}
+            </div>
+          ))}
       </div>
     </div>
   )

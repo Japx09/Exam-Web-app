@@ -4,14 +4,10 @@ import React, { useState, useEffect, useMemo } from 'react'
 import {
   Search,
   ChevronLeft,
-  Bot,
-  Award,
   ArrowUpDown,
   ChevronDown,
   ChevronUp,
-  Sparkles,
-  AlertCircle,
-  Layers
+  AlertCircle
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { parseExamDetails } from '@/data/midtermQuestions'
@@ -73,7 +69,6 @@ export default function ViewScore() {
     }
   }
 
-  // Filter & Sort
   const filteredAndSortedExams = useMemo(() => {
     return exams
       .filter((exam) => {
@@ -130,173 +125,133 @@ export default function ViewScore() {
 
   return (
     <div className="min-h-screen bg-neutral-50 text-neutral-900 pb-16">
-      {/* Top Navbar */}
-      <div className="border-b border-neutral-200 bg-white sticky top-0 z-20">
-        <div className="max-w-6xl mx-auto px-4 sm:px-6 h-16 flex items-center justify-between">
-          <Link
-            href="/"
-            className="flex items-center space-x-2 text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors"
-          >
-            <ChevronLeft className="w-4 h-4" />
-            <span>Back to Home</span>
-          </Link>
+      {/* Fixed/Sticky Top Header & Filter Controls */}
+      <div className="border-b border-neutral-200 bg-white/95 backdrop-blur-xs sticky top-0 z-30">
+        <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3.5 flex flex-col gap-3">
+          <div className="flex items-center justify-between">
+            <Link
+              href="/"
+              className="flex items-center space-x-1.5 text-xs sm:text-sm font-medium text-neutral-500 hover:text-neutral-900 transition-colors"
+            >
+              <ChevronLeft className="w-4 h-4" />
+              <span>Back to Home</span>
+            </Link>
 
-          <div className="flex items-center space-x-2 text-neutral-500 text-xs sm:text-sm">
-            <Award className="w-4 h-4 text-amber-500" />
-            <span>Official Examination Scoreboard</span>
+            <div className="flex items-center space-x-1 bg-neutral-100 p-1 rounded-lg">
+              {(['ALL', 'PRELIM', 'MIDTERM'] as const).map((period) => (
+                <button
+                  key={period}
+                  onClick={() => setExamPeriodFilter(period)}
+                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
+                    examPeriodFilter === period
+                      ? 'bg-white text-neutral-900 shadow-2xs'
+                      : 'text-neutral-600 hover:text-neutral-900'
+                  }`}
+                >
+                  {period === 'ALL' ? 'All' : period === 'PRELIM' ? 'Prelim' : 'Midterm'}
+                </button>
+              ))}
+            </div>
+          </div>
+
+          <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
+            {/* Section Tabs */}
+            <div className="flex items-center space-x-1 bg-neutral-100 p-1 rounded-lg w-fit">
+              <button
+                onClick={() => setActiveTab('BSIT 2-A')}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center space-x-1.5 ${
+                  activeTab === 'BSIT 2-A'
+                    ? 'bg-white text-neutral-900 shadow-2xs'
+                    : 'text-neutral-600 hover:text-neutral-900'
+                }`}
+              >
+                <span>BSIT 2-A</span>
+                <span className="text-[11px] text-neutral-400">({countSectionA})</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('BSIT 2-B')}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center space-x-1.5 ${
+                  activeTab === 'BSIT 2-B'
+                    ? 'bg-white text-neutral-900 shadow-2xs'
+                    : 'text-neutral-600 hover:text-neutral-900'
+                }`}
+              >
+                <span>BSIT 2-B</span>
+                <span className="text-[11px] text-neutral-400">({countSectionB})</span>
+              </button>
+
+              <button
+                onClick={() => setActiveTab('ALL')}
+                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center space-x-1.5 ${
+                  activeTab === 'ALL'
+                    ? 'bg-white text-neutral-900 shadow-2xs'
+                    : 'text-neutral-600 hover:text-neutral-900'
+                }`}
+              >
+                <span>All</span>
+                <span className="text-[11px] text-neutral-400">({countSectionA + countSectionB})</span>
+              </button>
+            </div>
+
+            {/* Search & Sort */}
+            <div className="flex items-center gap-2">
+              <div className="relative flex-1 sm:flex-initial">
+                <Search className="w-3.5 h-3.5 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <input
+                  type="text"
+                  placeholder="SEARCH NAME..."
+                  value={searchQuery}
+                  onChange={(e) => setSearchQuery(e.target.value.toUpperCase())}
+                  className="w-full sm:w-52 pl-8 pr-3 py-1.5 text-xs uppercase bg-white border border-neutral-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-neutral-900"
+                />
+              </div>
+
+              <div className="relative flex items-center">
+                <ArrowUpDown className="w-3.5 h-3.5 text-neutral-400 absolute left-2.5 pointer-events-none" />
+                <select
+                  value={sortBy}
+                  onChange={(e) => setSortBy(e.target.value as any)}
+                  className="pl-8 pr-7 py-1.5 text-xs bg-white border border-neutral-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-neutral-900 appearance-none text-neutral-700 font-medium cursor-pointer"
+                >
+                  <option value="name-asc">A – Z</option>
+                  <option value="name-desc">Z – A</option>
+                  <option value="score-desc">Highest</option>
+                  <option value="score-asc">Lowest</option>
+                </select>
+                <ChevronDown className="w-3.5 h-3.5 text-neutral-400 absolute right-2 pointer-events-none" />
+              </div>
+            </div>
           </div>
         </div>
       </div>
 
-      <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-8">
-        {/* Page Title Header */}
-        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
-          <div>
-            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-neutral-900">Student Scoreboard</h1>
-            <p className="text-sm text-neutral-500 mt-1">
-              View official Prelim and Midterm scores (Objective 40 pts + AI Essay 10 pts = 50 pts).
-            </p>
-          </div>
-
-          {/* Exam Period Filter Pills */}
-          <div className="flex items-center space-x-1 bg-neutral-200/70 p-1 rounded-xl w-fit">
-            {(['ALL', 'PRELIM', 'MIDTERM'] as const).map((period) => (
-              <button
-                key={period}
-                onClick={() => setExamPeriodFilter(period)}
-                className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${
-                  examPeriodFilter === period
-                    ? 'bg-neutral-900 text-white shadow-2xs'
-                    : 'text-neutral-600 hover:text-neutral-900'
-                }`}
-              >
-                {period === 'ALL' ? 'All Exams' : period}
-              </button>
-            ))}
-          </div>
-        </div>
-
-        {/* Section Tabs & Search/Sort Controls */}
-        <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-neutral-200 pb-4 mb-6">
-          <div className="flex items-center space-x-1 bg-neutral-100 p-1 rounded-xl w-fit">
-            <button
-              onClick={() => setActiveTab('BSIT 2-A')}
-              className={`px-4 py-2 text-sm font-medium rounded-lg transition-all flex items-center space-x-2 ${
-                activeTab === 'BSIT 2-A'
-                  ? 'bg-white text-neutral-900 shadow-sm'
-                  : 'text-neutral-600 hover:text-neutral-900'
-              }`}
-            >
-              <span>BSIT 2-A</span>
-              <span
-                className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
-                  activeTab === 'BSIT 2-A' ? 'bg-neutral-100 text-neutral-800' : 'bg-neutral-200 text-neutral-600'
-                }`}
-              >
-                {countSectionA}
-              </span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('BSIT 2-B')}
-              className={`px-4 py-2 text-sm font-medium rounded-lg transition-all flex items-center space-x-2 ${
-                activeTab === 'BSIT 2-B'
-                  ? 'bg-white text-neutral-900 shadow-sm'
-                  : 'text-neutral-600 hover:text-neutral-900'
-              }`}
-            >
-              <span>BSIT 2-B</span>
-              <span
-                className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
-                  activeTab === 'BSIT 2-B' ? 'bg-neutral-100 text-neutral-800' : 'bg-neutral-200 text-neutral-600'
-                }`}
-              >
-                {countSectionB}
-              </span>
-            </button>
-
-            <button
-              onClick={() => setActiveTab('ALL')}
-              className={`px-4 py-2 text-sm font-medium rounded-lg transition-all flex items-center space-x-2 ${
-                activeTab === 'ALL'
-                  ? 'bg-white text-neutral-900 shadow-sm'
-                  : 'text-neutral-600 hover:text-neutral-900'
-              }`}
-            >
-              <span>All Sections</span>
-              <span
-                className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
-                  activeTab === 'ALL' ? 'bg-neutral-100 text-neutral-800' : 'bg-neutral-200 text-neutral-600'
-                }`}
-              >
-                {countSectionA + countSectionB}
-              </span>
-            </button>
-          </div>
-
-          {/* Search & Sort Controls */}
-          <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-            <div className="relative">
-              <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
-              <input
-                type="text"
-                placeholder="SEARCH STUDENT NAME..."
-                value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value.toUpperCase())}
-                className="w-full sm:w-64 pl-9 pr-3 py-2 text-xs font-semibold uppercase bg-white border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-neutral-900 transition-all placeholder:text-neutral-400"
-              />
-            </div>
-
-            <div className="relative flex items-center">
-              <ArrowUpDown className="w-4 h-4 text-neutral-400 absolute left-3 pointer-events-none" />
-              <select
-                value={sortBy}
-                onChange={(e) => setSortBy(e.target.value as any)}
-                className="w-full sm:w-auto pl-9 pr-8 py-2 text-sm bg-white border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-neutral-900 transition-all appearance-none text-neutral-700 font-medium cursor-pointer"
-              >
-                <option value="name-asc">Sort: A to Z</option>
-                <option value="name-desc">Sort: Z to A</option>
-                <option value="score-desc">Highest Score</option>
-                <option value="score-asc">Lowest Score</option>
-              </select>
-              <ChevronDown className="w-4 h-4 text-neutral-400 absolute right-3 pointer-events-none" />
-            </div>
-          </div>
-        </div>
-
-        {/* Error Notice */}
+      <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-6">
         {error && (
-          <div className="mb-6 p-4 rounded-xl bg-red-50 border border-red-200 flex items-center space-x-3 text-red-700 text-sm">
-            <AlertCircle className="w-5 h-5 flex-shrink-0" />
+          <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 flex items-center space-x-2 text-red-700 text-xs">
+            <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{error}</span>
           </div>
         )}
 
-        {/* Scores Table */}
-        <div className="bg-white rounded-xl border border-neutral-200 shadow-sm overflow-hidden">
+        <div className="bg-white rounded-xl border border-neutral-200 shadow-xs overflow-hidden">
           {loading ? (
-            <div className="py-20 text-center flex flex-col items-center justify-center space-y-3">
-              <div className="w-8 h-8 border-2 border-neutral-900 border-t-transparent rounded-full animate-spin" />
-              <p className="text-sm text-neutral-500 font-medium">Loading scores...</p>
-            </div>
+            <div className="py-16 text-center text-xs text-neutral-400">Loading scores...</div>
           ) : filteredAndSortedExams.length === 0 ? (
-            <div className="py-16 text-center text-neutral-500">
-              <p className="font-medium text-base text-neutral-700">No records found</p>
-              <p className="text-sm mt-1">Try adjusting your search query, section tab, or exam period filter.</p>
-            </div>
+            <div className="py-16 text-center text-xs text-neutral-400">No matching records found.</div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse text-sm">
                 <thead>
-                  <tr className="bg-neutral-50/75 border-b border-neutral-200 text-neutral-600 font-medium text-xs uppercase tracking-wider">
-                    <th className="py-3.5 px-4 sm:px-6 w-12 text-center">#</th>
-                    <th className="py-3.5 px-4 sm:px-6">Student Name</th>
-                    <th className="py-3.5 px-4 sm:px-6">Exam</th>
-                    {activeTab === 'ALL' && <th className="py-3.5 px-4 sm:px-6">Section</th>}
-                    <th className="py-3.5 px-4 sm:px-6 text-center">Objective (/40)</th>
-                    <th className="py-3.5 px-4 sm:px-6 text-center">Essay (/10)</th>
-                    <th className="py-3.5 px-4 sm:px-6 text-center">Total (/50)</th>
-                    <th className="py-3.5 px-4 sm:px-6 text-right">Details</th>
+                  <tr className="bg-neutral-50 border-b border-neutral-200 text-neutral-500 font-medium text-xs">
+                    <th className="py-3 px-4 w-10 text-center">#</th>
+                    <th className="py-3 px-4">Student Name</th>
+                    <th className="py-3 px-4">Period</th>
+                    {activeTab === 'ALL' && <th className="py-3 px-4">Section</th>}
+                    <th className="py-3 px-4 text-center">Objective (/40)</th>
+                    <th className="py-3 px-4 text-center">Essay (/10)</th>
+                    <th className="py-3 px-4 text-center">Total (/50)</th>
+                    <th className="py-3 px-4 w-10"></th>
                   </tr>
                 </thead>
                 <tbody className="divide-y divide-neutral-100">
@@ -309,123 +264,61 @@ export default function ViewScore() {
                       <React.Fragment key={exam.id}>
                         <tr
                           onClick={() => toggleRow(exam.id)}
-                          className={`hover:bg-neutral-50/80 transition-colors cursor-pointer ${
-                            isExpanded ? 'bg-neutral-50/50' : ''
-                          }`}
+                          className="hover:bg-neutral-50/80 transition-colors cursor-pointer"
                         >
-                          <td className="py-4 px-4 sm:px-6 text-center text-neutral-400 font-mono text-xs">
+                          <td className="py-3.5 px-4 text-center text-neutral-400 font-mono text-xs">
                             {index + 1}
                           </td>
-                          <td className="py-4 px-4 sm:px-6 font-bold text-neutral-900 uppercase tracking-wide">
-                            <div className="flex flex-wrap items-center gap-2">
-                              <span>{exam.student_name.toUpperCase()}</span>
-                              {exam.is_essay_pasted && (
-                                <span className="inline-flex text-[10px] px-2 py-0.5 rounded-full font-semibold bg-red-100 text-red-700">
-                                  Pasted
-                                </span>
-                              )}
-                              {exam.violation_count > 0 && (
-                                <span className="inline-flex text-[10px] px-2 py-0.5 rounded-full font-semibold bg-amber-100 text-amber-800">
-                                  {exam.violation_count} {exam.violation_count === 1 ? 'violation' : 'violations'}
-                                </span>
-                              )}
-                            </div>
+                          <td className="py-3.5 px-4 font-medium text-neutral-900 uppercase text-xs sm:text-sm">
+                            {exam.student_name.toUpperCase()}
                           </td>
-                          <td className="py-4 px-4 sm:px-6">
-                            <span
-                              className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider ${
-                                details.examType === 'MIDTERM'
-                                  ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
-                                  : 'bg-neutral-100 text-neutral-700 border border-neutral-200'
-                              }`}
-                            >
+                          <td className="py-3.5 px-4">
+                            <span className="inline-flex px-2 py-0.5 rounded text-[11px] font-medium bg-neutral-100 text-neutral-600">
                               {details.examType}
                             </span>
                           </td>
                           {activeTab === 'ALL' && (
-                            <td className="py-4 px-4 sm:px-6 text-neutral-600">
-                              <span className="inline-flex items-center px-2 py-0.5 rounded text-xs font-medium bg-neutral-100 text-neutral-700">
-                                {exam.section}
-                              </span>
-                            </td>
+                            <td className="py-3.5 px-4 text-xs text-neutral-500">{exam.section}</td>
                           )}
-                          <td className="py-4 px-4 sm:px-6 text-center text-neutral-700 font-medium">
-                            <div className="flex flex-col items-center">
-                              <span className="font-bold text-neutral-900">{exam.mcq_score}</span>
-                              {details.examType === 'MIDTERM' && details.part1Mcq !== null && (
-                                <span className="text-[10px] text-neutral-400">
-                                  MCQ {details.part1Mcq}/30 • UI {details.part2Dnd}/10
-                                </span>
-                              )}
-                            </div>
+                          <td className="py-3.5 px-4 text-center text-neutral-700 text-xs sm:text-sm">
+                            {exam.mcq_score}
                           </td>
-                          <td className="py-4 px-4 sm:px-6 text-center">
-                            <span className="inline-flex items-center space-x-1 font-medium text-neutral-700">
-                              <Bot className="w-3.5 h-3.5 text-indigo-500 mr-1" />
-                              <span>{exam.ai_score !== null ? exam.ai_score : '—'}</span>
-                            </span>
+                          <td className="py-3.5 px-4 text-center text-neutral-700 text-xs sm:text-sm">
+                            {exam.ai_score !== null ? exam.ai_score : '—'}
                           </td>
-                          <td className="py-4 px-4 sm:px-6 text-center">
+                          <td className="py-3.5 px-4 text-center">
                             <span
-                              className={`inline-flex items-center justify-center px-2.5 py-1 rounded-md font-bold text-xs ${
-                                totalScore >= 35
-                                  ? 'bg-emerald-50 text-emerald-700 border border-emerald-200/60'
-                                  : totalScore >= 25
-                                  ? 'bg-blue-50 text-blue-700 border border-blue-200/60'
-                                  : 'bg-neutral-100 text-neutral-700'
+                              className={`inline-flex px-2 py-0.5 rounded text-xs font-semibold ${
+                                totalScore >= 25
+                                  ? 'bg-green-50 text-green-700'
+                                  : 'bg-red-50 text-red-700'
                               }`}
                             >
                               {totalScore} / 50
                             </span>
                           </td>
-                          <td className="py-4 px-4 sm:px-6 text-right">
-                            <button
-                              type="button"
-                              onClick={(e) => {
-                                e.stopPropagation()
-                                toggleRow(exam.id)
-                              }}
-                              className="text-neutral-400 hover:text-neutral-700 p-1 transition-colors"
-                            >
-                              {isExpanded ? <ChevronUp className="w-4 h-4" /> : <ChevronDown className="w-4 h-4" />}
-                            </button>
+                          <td className="py-3.5 px-4 text-right text-neutral-400">
+                            {isExpanded ? (
+                              <ChevronUp className="w-4 h-4" />
+                            ) : (
+                              <ChevronDown className="w-4 h-4" />
+                            )}
                           </td>
                         </tr>
 
-                        {/* Collapsible Feedback Drawer */}
                         {isExpanded && (
-                          <tr className="bg-neutral-50/70 border-b border-neutral-100">
-                            <td colSpan={activeTab === 'ALL' ? 8 : 7} className="px-6 py-4">
-                              <div className="bg-white rounded-lg p-4 border border-neutral-200 shadow-2xs space-y-2.5">
+                          <tr className="bg-neutral-50/60">
+                            <td colSpan={activeTab === 'ALL' ? 8 : 7} className="px-5 py-3.5">
+                              <div className="text-xs text-neutral-600 space-y-1.5">
                                 {details.examType === 'MIDTERM' && details.part1Mcq !== null && (
-                                  <div className="flex flex-wrap items-center gap-3 pb-2 border-b border-neutral-100 text-xs">
-                                    <span className="font-semibold text-neutral-700 flex items-center gap-1">
-                                      <Layers className="w-3.5 h-3.5 text-indigo-600" />
-                                      <span>Midterm Breakdown:</span>
-                                    </span>
-                                    <span className="bg-neutral-100 px-2.5 py-0.5 rounded font-medium text-neutral-800">
-                                      Part I Situational MCQ: <strong>{details.part1Mcq} / 30</strong>
-                                    </span>
-                                    <span className="bg-neutral-100 px-2.5 py-0.5 rounded font-medium text-neutral-800">
-                                      Part II Wireframe Placement: <strong>{details.part2Dnd} / 10</strong>
-                                    </span>
-                                    <span className="bg-indigo-50 px-2.5 py-0.5 rounded font-medium text-indigo-800">
-                                      Part III Essays: <strong>{exam.ai_score ?? 0} / 10</strong>
-                                    </span>
+                                  <div className="text-neutral-500 font-medium">
+                                    Part I MCQ: {details.part1Mcq}/30 • Part II Wireframe: {details.part2Dnd}/10 • Part III Essay: {exam.ai_score ?? 0}/10
                                   </div>
                                 )}
-                                <div className="flex items-center space-x-2 text-indigo-700 text-xs font-semibold uppercase tracking-wider">
-                                  <Sparkles className="w-3.5 h-3.5" />
-                                  <span>AI Evaluation & Feedback</span>
+                                <div>
+                                  <span className="font-semibold text-neutral-800 mr-1.5">Feedback:</span>
+                                  <span>{exam.ai_feedback || 'No feedback available.'}</span>
                                 </div>
-                                <p className="text-sm text-neutral-700 leading-relaxed">
-                                  {exam.ai_feedback || 'No written feedback available.'}
-                                </p>
-                                {exam.is_essay_pasted && (
-                                  <p className="text-xs text-red-600 font-medium pt-1">
-                                    ⚠️ Note: Essay was flagged as copy-pasted from an external source.
-                                  </p>
-                                )}
                               </div>
                             </td>
                           </tr>
