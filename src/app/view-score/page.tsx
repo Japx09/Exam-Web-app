@@ -1,8 +1,20 @@
 'use client'
 
 import React, { useState, useEffect, useMemo } from 'react'
-import { Search, ChevronLeft, Bot, Award, ArrowUpDown, ChevronDown, ChevronUp, Sparkles, AlertCircle } from 'lucide-react'
+import {
+  Search,
+  ChevronLeft,
+  Bot,
+  Award,
+  ArrowUpDown,
+  ChevronDown,
+  ChevronUp,
+  Sparkles,
+  AlertCircle,
+  Layers
+} from 'lucide-react'
 import { supabase } from '@/lib/supabase'
+import { parseExamDetails } from '@/data/midtermQuestions'
 import Link from 'next/link'
 
 interface ExamRecord {
@@ -12,6 +24,7 @@ interface ExamRecord {
   mcq_score: number
   ai_score: number | null
   ai_feedback: string | null
+  essay_answer: string | null
   is_essay_pasted: boolean
   violation_count: number
   created_at: string
@@ -22,6 +35,7 @@ export default function ViewScore() {
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [activeTab, setActiveTab] = useState<'BSIT 2-A' | 'BSIT 2-B' | 'ALL'>('BSIT 2-A')
+  const [examPeriodFilter, setExamPeriodFilter] = useState<'ALL' | 'PRELIM' | 'MIDTERM'>('ALL')
   const [searchQuery, setSearchQuery] = useState('')
   const [sortBy, setSortBy] = useState<'name-asc' | 'name-desc' | 'score-desc' | 'score-asc'>('name-asc')
   const [expandedRow, setExpandedRow] = useState<string | null>(null)
@@ -29,7 +43,6 @@ export default function ViewScore() {
   useEffect(() => {
     fetchScores()
 
-    // Realtime updates
     const channel = supabase
       .channel('public:exams:view-score')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'exams' }, () => {
@@ -64,30 +77,52 @@ export default function ViewScore() {
   const filteredAndSortedExams = useMemo(() => {
     return exams
       .filter((exam) => {
+        const details = parseExamDetails(exam)
         const matchesTab = activeTab === 'ALL' || exam.section === activeTab
-        const matchesSearch = exam.student_name.toLowerCase().includes(searchQuery.toLowerCase().trim())
-        return matchesTab && matchesSearch
+        const matchesPeriod = examPeriodFilter === 'ALL' || details.examType === examPeriodFilter
+        const matchesSearch = exam.student_name
+          .toUpperCase()
+          .includes(searchQuery.toUpperCase().trim())
+        return matchesTab && matchesPeriod && matchesSearch
       })
       .sort((a, b) => {
         const totalA = (a.mcq_score || 0) + (a.ai_score || 0)
         const totalB = (b.mcq_score || 0) + (b.ai_score || 0)
+        const nameA = a.student_name.toUpperCase()
+        const nameB = b.student_name.toUpperCase()
 
         switch (sortBy) {
           case 'name-desc':
-            return b.student_name.localeCompare(a.student_name)
+            return nameB.localeCompare(nameA)
           case 'score-desc':
-            return totalB - totalA || a.student_name.localeCompare(b.student_name)
+            return totalB - totalA || nameA.localeCompare(nameB)
           case 'score-asc':
-            return totalA - totalB || a.student_name.localeCompare(b.student_name)
+            return totalA - totalB || nameA.localeCompare(nameB)
           case 'name-asc':
           default:
-            return a.student_name.localeCompare(b.student_name)
+            return nameA.localeCompare(nameB)
         }
       })
-  }, [exams, activeTab, searchQuery, sortBy])
+  }, [exams, activeTab, examPeriodFilter, searchQuery, sortBy])
 
-  const countSectionA = useMemo(() => exams.filter((e) => e.section === 'BSIT 2-A').length, [exams])
-  const countSectionB = useMemo(() => exams.filter((e) => e.section === 'BSIT 2-B').length, [exams])
+  const countSectionA = useMemo(
+    () =>
+      exams.filter(
+        (e) =>
+          e.section === 'BSIT 2-A' &&
+          (examPeriodFilter === 'ALL' || parseExamDetails(e).examType === examPeriodFilter)
+      ).length,
+    [exams, examPeriodFilter]
+  )
+  const countSectionB = useMemo(
+    () =>
+      exams.filter(
+        (e) =>
+          e.section === 'BSIT 2-B' &&
+          (examPeriodFilter === 'ALL' || parseExamDetails(e).examType === examPeriodFilter)
+      ).length,
+    [exams, examPeriodFilter]
+  )
 
   const toggleRow = (id: string) => {
     setExpandedRow((prev) => (prev === id ? null : id))
@@ -108,21 +143,40 @@ export default function ViewScore() {
 
           <div className="flex items-center space-x-2 text-neutral-500 text-xs sm:text-sm">
             <Award className="w-4 h-4 text-amber-500" />
-            <span>Multimedia Exam Results</span>
+            <span>Official Examination Scoreboard</span>
           </div>
         </div>
       </div>
 
       <div className="max-w-6xl mx-auto px-4 sm:px-6 pt-8">
         {/* Page Title Header */}
-        <div className="mb-8">
-          <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-neutral-900">Student Scoreboard</h1>
-          <p className="text-sm text-neutral-500 mt-1">
-            Check your official scores for Multiple Choice (40 pts) and AI Essay Evaluation (10 pts).
-          </p>
+        <div className="flex flex-col sm:flex-row sm:items-end justify-between gap-4 mb-6">
+          <div>
+            <h1 className="text-2xl sm:text-3xl font-bold tracking-tight text-neutral-900">Student Scoreboard</h1>
+            <p className="text-sm text-neutral-500 mt-1">
+              View official Prelim and Midterm scores (Objective 40 pts + AI Essay 10 pts = 50 pts).
+            </p>
+          </div>
+
+          {/* Exam Period Filter Pills */}
+          <div className="flex items-center space-x-1 bg-neutral-200/70 p-1 rounded-xl w-fit">
+            {(['ALL', 'PRELIM', 'MIDTERM'] as const).map((period) => (
+              <button
+                key={period}
+                onClick={() => setExamPeriodFilter(period)}
+                className={`px-3 py-1.5 rounded-lg text-xs font-bold uppercase tracking-wider transition-all ${
+                  examPeriodFilter === period
+                    ? 'bg-neutral-900 text-white shadow-2xs'
+                    : 'text-neutral-600 hover:text-neutral-900'
+                }`}
+              >
+                {period === 'ALL' ? 'All Exams' : period}
+              </button>
+            ))}
+          </div>
         </div>
 
-        {/* Section Tabs */}
+        {/* Section Tabs & Search/Sort Controls */}
         <div className="flex flex-col sm:flex-row sm:items-center sm:justify-between gap-4 border-b border-neutral-200 pb-4 mb-6">
           <div className="flex items-center space-x-1 bg-neutral-100 p-1 rounded-xl w-fit">
             <button
@@ -134,9 +188,11 @@ export default function ViewScore() {
               }`}
             >
               <span>BSIT 2-A</span>
-              <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
-                activeTab === 'BSIT 2-A' ? 'bg-neutral-100 text-neutral-800' : 'bg-neutral-200 text-neutral-600'
-              }`}>
+              <span
+                className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
+                  activeTab === 'BSIT 2-A' ? 'bg-neutral-100 text-neutral-800' : 'bg-neutral-200 text-neutral-600'
+                }`}
+              >
                 {countSectionA}
               </span>
             </button>
@@ -150,9 +206,11 @@ export default function ViewScore() {
               }`}
             >
               <span>BSIT 2-B</span>
-              <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
-                activeTab === 'BSIT 2-B' ? 'bg-neutral-100 text-neutral-800' : 'bg-neutral-200 text-neutral-600'
-              }`}>
+              <span
+                className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
+                  activeTab === 'BSIT 2-B' ? 'bg-neutral-100 text-neutral-800' : 'bg-neutral-200 text-neutral-600'
+                }`}
+              >
                 {countSectionB}
               </span>
             </button>
@@ -166,29 +224,29 @@ export default function ViewScore() {
               }`}
             >
               <span>All Sections</span>
-              <span className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
-                activeTab === 'ALL' ? 'bg-neutral-100 text-neutral-800' : 'bg-neutral-200 text-neutral-600'
-              }`}>
-                {exams.length}
+              <span
+                className={`text-xs px-2 py-0.5 rounded-full font-semibold ${
+                  activeTab === 'ALL' ? 'bg-neutral-100 text-neutral-800' : 'bg-neutral-200 text-neutral-600'
+                }`}
+              >
+                {countSectionA + countSectionB}
               </span>
             </button>
           </div>
 
           {/* Search & Sort Controls */}
           <div className="flex flex-col sm:flex-row items-stretch sm:items-center gap-3">
-            {/* Search Input */}
             <div className="relative">
               <Search className="w-4 h-4 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
               <input
                 type="text"
-                placeholder="Search student name..."
+                placeholder="SEARCH STUDENT NAME..."
                 value={searchQuery}
-                onChange={(e) => setSearchQuery(e.target.value)}
-                className="w-full sm:w-64 pl-9 pr-3 py-2 text-sm bg-white border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-neutral-900 transition-all placeholder:text-neutral-400"
+                onChange={(e) => setSearchQuery(e.target.value.toUpperCase())}
+                className="w-full sm:w-64 pl-9 pr-3 py-2 text-xs font-semibold uppercase bg-white border border-neutral-300 rounded-lg focus:outline-none focus:ring-2 focus:ring-neutral-900 transition-all placeholder:text-neutral-400"
               />
             </div>
 
-            {/* Sort Dropdown */}
             <div className="relative flex items-center">
               <ArrowUpDown className="w-4 h-4 text-neutral-400 absolute left-3 pointer-events-none" />
               <select
@@ -224,7 +282,7 @@ export default function ViewScore() {
           ) : filteredAndSortedExams.length === 0 ? (
             <div className="py-16 text-center text-neutral-500">
               <p className="font-medium text-base text-neutral-700">No records found</p>
-              <p className="text-sm mt-1">Try adjusting your search query or section tab.</p>
+              <p className="text-sm mt-1">Try adjusting your search query, section tab, or exam period filter.</p>
             </div>
           ) : (
             <div className="overflow-x-auto">
@@ -233,8 +291,9 @@ export default function ViewScore() {
                   <tr className="bg-neutral-50/75 border-b border-neutral-200 text-neutral-600 font-medium text-xs uppercase tracking-wider">
                     <th className="py-3.5 px-4 sm:px-6 w-12 text-center">#</th>
                     <th className="py-3.5 px-4 sm:px-6">Student Name</th>
+                    <th className="py-3.5 px-4 sm:px-6">Exam</th>
                     {activeTab === 'ALL' && <th className="py-3.5 px-4 sm:px-6">Section</th>}
-                    <th className="py-3.5 px-4 sm:px-6 text-center">MCQ (/40)</th>
+                    <th className="py-3.5 px-4 sm:px-6 text-center">Objective (/40)</th>
                     <th className="py-3.5 px-4 sm:px-6 text-center">Essay (/10)</th>
                     <th className="py-3.5 px-4 sm:px-6 text-center">Total (/50)</th>
                     <th className="py-3.5 px-4 sm:px-6 text-right">Details</th>
@@ -242,7 +301,8 @@ export default function ViewScore() {
                 </thead>
                 <tbody className="divide-y divide-neutral-100">
                   {filteredAndSortedExams.map((exam, index) => {
-                    const totalScore = (exam.mcq_score || 0) + (exam.ai_score || 0)
+                    const details = parseExamDetails(exam)
+                    const totalScore = details.totalScore
                     const isExpanded = expandedRow === exam.id
 
                     return (
@@ -256,20 +316,31 @@ export default function ViewScore() {
                           <td className="py-4 px-4 sm:px-6 text-center text-neutral-400 font-mono text-xs">
                             {index + 1}
                           </td>
-                          <td className="py-4 px-4 sm:px-6 font-semibold text-neutral-900">
-                            <div className="flex items-center space-x-2">
-                              <span>{exam.student_name}</span>
+                          <td className="py-4 px-4 sm:px-6 font-bold text-neutral-900 uppercase tracking-wide">
+                            <div className="flex flex-wrap items-center gap-2">
+                              <span>{exam.student_name.toUpperCase()}</span>
                               {exam.is_essay_pasted && (
-                                <span className="inline-flex text-[11px] px-2 py-0.5 rounded-full font-medium bg-red-100 text-red-700">
+                                <span className="inline-flex text-[10px] px-2 py-0.5 rounded-full font-semibold bg-red-100 text-red-700">
                                   Pasted
                                 </span>
                               )}
                               {exam.violation_count > 0 && (
-                                <span className="inline-flex text-[11px] px-2 py-0.5 rounded-full font-medium bg-amber-100 text-amber-800">
+                                <span className="inline-flex text-[10px] px-2 py-0.5 rounded-full font-semibold bg-amber-100 text-amber-800">
                                   {exam.violation_count} {exam.violation_count === 1 ? 'violation' : 'violations'}
                                 </span>
                               )}
                             </div>
+                          </td>
+                          <td className="py-4 px-4 sm:px-6">
+                            <span
+                              className={`inline-flex items-center px-2 py-0.5 rounded text-[11px] font-bold uppercase tracking-wider ${
+                                details.examType === 'MIDTERM'
+                                  ? 'bg-indigo-50 text-indigo-700 border border-indigo-200'
+                                  : 'bg-neutral-100 text-neutral-700 border border-neutral-200'
+                              }`}
+                            >
+                              {details.examType}
+                            </span>
                           </td>
                           {activeTab === 'ALL' && (
                             <td className="py-4 px-4 sm:px-6 text-neutral-600">
@@ -279,7 +350,14 @@ export default function ViewScore() {
                             </td>
                           )}
                           <td className="py-4 px-4 sm:px-6 text-center text-neutral-700 font-medium">
-                            {exam.mcq_score}
+                            <div className="flex flex-col items-center">
+                              <span className="font-bold text-neutral-900">{exam.mcq_score}</span>
+                              {details.examType === 'MIDTERM' && details.part1Mcq !== null && (
+                                <span className="text-[10px] text-neutral-400">
+                                  MCQ {details.part1Mcq}/30 • UI {details.part2Dnd}/10
+                                </span>
+                              )}
+                            </div>
                           </td>
                           <td className="py-4 px-4 sm:px-6 text-center">
                             <span className="inline-flex items-center space-x-1 font-medium text-neutral-700">
@@ -317,8 +395,25 @@ export default function ViewScore() {
                         {/* Collapsible Feedback Drawer */}
                         {isExpanded && (
                           <tr className="bg-neutral-50/70 border-b border-neutral-100">
-                            <td colSpan={activeTab === 'ALL' ? 7 : 6} className="px-6 py-4">
-                              <div className="bg-white rounded-lg p-4 border border-neutral-200 shadow-2xs space-y-2">
+                            <td colSpan={activeTab === 'ALL' ? 8 : 7} className="px-6 py-4">
+                              <div className="bg-white rounded-lg p-4 border border-neutral-200 shadow-2xs space-y-2.5">
+                                {details.examType === 'MIDTERM' && details.part1Mcq !== null && (
+                                  <div className="flex flex-wrap items-center gap-3 pb-2 border-b border-neutral-100 text-xs">
+                                    <span className="font-semibold text-neutral-700 flex items-center gap-1">
+                                      <Layers className="w-3.5 h-3.5 text-indigo-600" />
+                                      <span>Midterm Breakdown:</span>
+                                    </span>
+                                    <span className="bg-neutral-100 px-2.5 py-0.5 rounded font-medium text-neutral-800">
+                                      Part I Situational MCQ: <strong>{details.part1Mcq} / 30</strong>
+                                    </span>
+                                    <span className="bg-neutral-100 px-2.5 py-0.5 rounded font-medium text-neutral-800">
+                                      Part II Wireframe Placement: <strong>{details.part2Dnd} / 10</strong>
+                                    </span>
+                                    <span className="bg-indigo-50 px-2.5 py-0.5 rounded font-medium text-indigo-800">
+                                      Part III Essays: <strong>{exam.ai_score ?? 0} / 10</strong>
+                                    </span>
+                                  </div>
+                                )}
                                 <div className="flex items-center space-x-2 text-indigo-700 text-xs font-semibold uppercase tracking-wider">
                                   <Sparkles className="w-3.5 h-3.5" />
                                   <span>AI Evaluation & Feedback</span>

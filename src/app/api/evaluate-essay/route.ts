@@ -1,5 +1,6 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
+import { isMidtermRecord, midtermCombinedEssayPromptForAI } from '@/data/midtermQuestions';
 
 export const dynamic = 'force-dynamic';
 
@@ -7,8 +8,8 @@ export async function POST(request: Request) {
   try {
     const { essay, prompt } = await request.json();
 
-    if (!essay || !prompt) {
-      return NextResponse.json({ error: 'Missing essay or prompt' }, { status: 400 });
+    if (!essay) {
+      return NextResponse.json({ error: 'Missing essay' }, { status: 400 });
     }
 
     const apiKey = process.env.GEMINI_API_KEY;
@@ -18,15 +19,27 @@ export async function POST(request: Request) {
 
     const ai = new GoogleGenAI({ apiKey });
 
-    const systemInstruction = `
-      You are a strict and objective exam evaluator checking a multimedia exam essay out of 10 points.
-      The prompt was: "${prompt}"
-      
-      Criteria:
-      - 0 points if it is completely off-topic or likely AI-generated nonsense.
-      - Evaluate based on how well it answers the prompt.
-      - Provide a score (0 to 10) and a short 1-2 sentence feedback.
-    `;
+    const isMidterm = isMidtermRecord({ essay_answer: essay }) || (prompt && prompt.includes('MIDTERM'));
+
+    const systemInstruction = isMidterm
+      ? `
+        You are an objective UX Design and AI Workflow instructor evaluating a student's two Midterm exam essays out of 10 total points (5 points for Essay 1 + 5 points for Essay 2).
+        ${midtermCombinedEssayPromptForAI}
+        
+        Instructions:
+        - Award 0 points if an essay is completely off-topic or nonsense.
+        - Grade Essay 1 out of 5 points and Essay 2 out of 5 points, then sum them for the total "score" (0 to 10).
+        - In "feedback", briefly state the breakdown (e.g., "Essay 1 (4/5): ... | Essay 2 (5/5): ...") in 2-3 concise sentences.
+      `
+      : `
+        You are a strict and objective exam evaluator checking a multimedia exam essay out of 10 points.
+        The prompt was: "${prompt}"
+        
+        Criteria:
+        - 0 points if it is completely off-topic or likely AI-generated nonsense.
+        - Evaluate based on how well it answers the prompt.
+        - Provide a score (0 to 10) and a short 1-2 sentence feedback.
+      `;
 
     const response = await ai.models.generateContent({
       model: 'gemini-3.6-flash',
@@ -39,11 +52,11 @@ export async function POST(request: Request) {
           properties: {
             score: {
               type: "INTEGER",
-              description: "The score out of 10"
+              description: "The total score out of 10"
             },
             feedback: {
               type: "STRING",
-              description: "1 to 2 sentences of feedback"
+              description: "Concise constructive feedback with score breakdown if Midterm"
             }
           },
           required: ["score", "feedback"]
