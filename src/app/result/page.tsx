@@ -63,7 +63,7 @@ export default function ResultPage() {
         let aiScore: number | null = 0
         let aiFeedback: string | null = 'No essay submitted.'
 
-        if (hasActualEssayContent && !isEssayPasted) {
+        if (hasActualEssayContent) {
           try {
             const res = await fetch('/api/evaluate-essay', {
               method: 'POST',
@@ -76,14 +76,14 @@ export default function ResultPage() {
             const data = await res.json()
             aiScore = data.score ?? 0
             aiFeedback = data.feedback ?? 'Evaluation failed.'
+            if (isEssayPasted) {
+              aiFeedback = `[Paste Flagged] ${aiFeedback}`
+            }
           } catch (e) {
             console.error('AI check failed', e)
             aiScore = 0
             aiFeedback = 'Error connecting to AI.'
           }
-        } else if (isEssayPasted) {
-          aiScore = 0
-          aiFeedback = 'Flagged: Essay was copy-pasted.'
         }
 
         setAiScoreState(aiScore)

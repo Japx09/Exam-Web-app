@@ -3,6 +3,7 @@ import { GoogleGenAI } from '@google/genai';
 import { isMidtermRecord, midtermCombinedEssayPromptForAI } from '@/data/midtermQuestions';
 
 export const dynamic = 'force-dynamic';
+export const maxDuration = 60;
 
 export async function POST(request: Request) {
   try {
@@ -46,6 +47,7 @@ export async function POST(request: Request) {
       contents: essay,
       config: {
         systemInstruction,
+        thinkingConfig: { thinkingBudget: 0 },
         responseMimeType: "application/json",
         responseSchema: {
           type: "OBJECT",
