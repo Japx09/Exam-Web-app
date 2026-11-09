@@ -124,8 +124,7 @@ export default function ExamPage() {
               Question {currentIndex + 1} of {shuffledQuestions.length}
             </span>
             {currentQ.topic && (
-              <span className="inline-flex items-center space-x-1 rounded-md bg-indigo-50 px-2.5 py-1 text-xs font-medium text-indigo-700 border border-indigo-100">
-                <Layers className="w-3 h-3" />
+              <span className="inline-flex items-center space-x-1 rounded-md bg-neutral-100 px-2.5 py-1 text-xs font-medium text-neutral-600">
                 <span>{currentQ.topic}</span>
               </span>
             )}

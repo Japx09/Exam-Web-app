@@ -138,9 +138,9 @@ export default function WireframeExamPage() {
     switch (el.uiType) {
       case 'badge':
         return (
-          <div className="w-full rounded-lg bg-amber-50/90 border border-amber-300 px-3 py-2 flex items-center justify-between text-amber-950">
+          <div className="w-full rounded-lg bg-neutral-100 border border-neutral-300 px-3 py-2 flex items-center justify-between text-neutral-900">
             <div className="flex flex-col">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-amber-700">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">
                 {el.code} • Status / Header Banner
               </span>
               <span className="text-xs sm:text-sm font-semibold mt-0.5">{el.label}</span>
@@ -170,9 +170,9 @@ export default function WireframeExamPage() {
       case 'card':
       default:
         return (
-          <div className="w-full rounded-lg bg-indigo-50/80 border border-indigo-200 px-3 py-2.5 flex flex-col space-y-1 text-indigo-950">
+          <div className="w-full rounded-lg bg-neutral-50 border border-neutral-300 px-3 py-2.5 flex flex-col space-y-1 text-neutral-900">
             <div className="flex items-center justify-between">
-              <span className="text-[10px] font-bold uppercase tracking-wider text-indigo-600">
+              <span className="text-[10px] font-bold uppercase tracking-wider text-neutral-500">
                 {el.code} • {el.subtext || 'UI Card'}
               </span>
             </div>
@@ -193,7 +193,7 @@ export default function WireframeExamPage() {
             <span className="font-medium text-neutral-700">{name}</span>
           </div>
           <div className="flex items-center space-x-3">
-            <span className="inline-flex items-center space-x-1 text-indigo-700 font-semibold">
+            <span className="inline-flex items-center space-x-1 text-neutral-700 font-semibold">
               <Layers className="w-3.5 h-3.5" />
               <span>Part II: Interactive Wireframe Placement (10 Pts)</span>
             </span>

@@ -168,7 +168,7 @@ export default function ResultPage() {
 
           <div className="flex justify-between items-center text-sm pt-2 border-t border-neutral-200">
             <span className="text-neutral-500 flex items-center gap-1">
-              <Bot className="w-4 h-4 text-indigo-500" />
+              <Bot className="w-4 h-4 text-neutral-600" />
               <span>{examType === 'MIDTERM' ? 'Part III: Essays (AI)' : 'Essay Score (AI)'}</span>
             </span>
             <span className="font-semibold text-neutral-900">
@@ -178,15 +178,15 @@ export default function ResultPage() {
 
           <div className="flex justify-between items-center pt-3 border-t border-neutral-200">
             <span className="text-sm font-bold text-neutral-900">Total Score</span>
-            <span className="text-lg font-bold text-emerald-700 bg-emerald-50 border border-emerald-200 px-3 py-0.5 rounded-lg">
+            <span className="text-lg font-bold text-neutral-900 bg-neutral-100 border border-neutral-200 px-3 py-0.5 rounded-lg">
               {totalScore} / 50
             </span>
           </div>
         </div>
 
         {aiFeedbackState && (
-          <div className="w-full text-left text-xs text-neutral-600 bg-indigo-50/50 border border-indigo-100 rounded-xl p-3.5 leading-relaxed">
-            <strong className="text-indigo-900 block mb-1">AI Feedback:</strong>
+          <div className="w-full text-left text-xs text-neutral-600 bg-neutral-50 border border-neutral-200 rounded-xl p-3.5 leading-relaxed">
+            <strong className="text-neutral-900 block mb-1">Evaluation Feedback:</strong>
             {aiFeedbackState}
           </div>
         )}
