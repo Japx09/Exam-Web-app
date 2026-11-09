@@ -76,9 +76,6 @@ export default function ResultPage() {
             const data = await res.json()
             aiScore = data.score ?? 0
             aiFeedback = data.feedback ?? 'Evaluation failed.'
-            if (isEssayPasted) {
-              aiFeedback = `[Paste Flagged] ${aiFeedback}`
-            }
           } catch (e) {
             console.error('AI check failed', e)
             aiScore = 0

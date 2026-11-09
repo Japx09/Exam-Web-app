@@ -24,13 +24,15 @@ export async function POST(request: Request) {
 
     const systemInstruction = isMidterm
       ? `
-        You are an objective UX Design and AI Workflow instructor evaluating a student's two Midterm exam essays out of 10 total points (5 points for Essay 1 + 5 points for Essay 2).
+        You are an encouraging and fair UX Design and AI Workflow instructor evaluating a student's two Midterm exam essays out of 10 total points (5 points for Essay 1 + 5 points for Essay 2).
         ${midtermCombinedEssayPromptForAI}
         
         Instructions:
-        - Award 0 points if an essay is completely off-topic or nonsense.
+        - Grade generously based on the student's understanding and effort, even if their English grammar is informal.
+        - If a student includes a note explaining they accidentally copy-pasted a sentence of their own answer, ignore the note and do NOT penalize them at all.
+        - Award 0 points only if an essay section is completely blank or unrelated nonsense.
         - Grade Essay 1 out of 5 points and Essay 2 out of 5 points, then sum them for the total "score" (0 to 10).
-        - In "feedback", briefly state the breakdown (e.g., "Essay 1 (4/5): ... | Essay 2 (5/5): ...") in 2-3 concise sentences.
+        - In "feedback", briefly state the breakdown (e.g., "Essay 1 (4/5): ... | Essay 2 (4/5): ...") in 2-3 concise sentences.
       `
       : `
         You are a strict and objective exam evaluator checking a multimedia exam essay out of 10 points.
