@@ -13,7 +13,7 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
-import { isMidtermRecord } from '@/data/midtermQuestions'
+import { ExamType, getExamType } from '@/lib/examUtils'
 
 interface StudentExamRecord {
   id: string
@@ -40,13 +40,14 @@ export default function Onboarding() {
   const [otpCode, setOtpCode] = useState('')
 
   const [otpSent, setOtpSent] = useState(false)
+  const [showManualOtp, setShowManualOtp] = useState(false)
   const [sendingOtp, setSendingOtp] = useState(false)
   const [verifyingOtp, setVerifyingOtp] = useState(false)
   const [isEmailVerified, setIsEmailVerified] = useState(false)
   const [otpHint, setOtpHint] = useState('')
 
-  // Step 3 state
-  const [selectedExamType, setSelectedExamType] = useState<'PRELIM' | 'MIDTERM'>('MIDTERM')
+  // Step 3 state (Prelim & Midterm globally locked; Pre-Final active)
+  const [selectedExamType, setSelectedExamType] = useState<ExamType>('PREFINAL')
 
   const [allRecords, setAllRecords] = useState<StudentExamRecord[]>([])
   const [loadingRecords, setLoadingRecords] = useState(true)
@@ -85,6 +86,8 @@ export default function Onboarding() {
         prelimScore: number | null
         hasMidterm: boolean
         midtermScore: number | null
+        hasPrefinal: boolean
+        prefinalScore: number | null
       }
     >()
 
@@ -97,11 +100,17 @@ export default function Onboarding() {
         hasPrelim: false,
         prelimScore: null,
         hasMidterm: false,
-        midtermScore: null
+        midtermScore: null,
+        hasPrefinal: false,
+        prefinalScore: null
       }
 
       const total = (row.mcq_score || 0) + (row.ai_score || 0)
-      if (isMidtermRecord(row)) {
+      const period = getExamType(row)
+      if (period === 'PREFINAL') {
+        current.hasPrefinal = true
+        current.prefinalScore = total
+      } else if (period === 'MIDTERM') {
         current.hasMidterm = true
         current.midtermScore = total
       } else {
@@ -134,6 +143,8 @@ export default function Onboarding() {
         prelimScore: null,
         hasMidterm: false,
         midtermScore: null,
+        hasPrefinal: false,
+        prefinalScore: null,
         registeredEmail: null as string | null
       }
     }
@@ -142,6 +153,8 @@ export default function Onboarding() {
     let prelimScore: number | null = null
     let hasMidterm = false
     let midtermScore: number | null = null
+    let hasPrefinal = false
+    let prefinalScore: number | null = null
     let registeredEmail: string | null = null
 
     for (const row of allRecords) {
@@ -152,7 +165,11 @@ export default function Onboarding() {
           registeredEmail = emailMatch[1].toLowerCase()
         }
 
-        if (isMidtermRecord(row)) {
+        const period = getExamType(row)
+        if (period === 'PREFINAL') {
+          hasPrefinal = true
+          prefinalScore = total
+        } else if (period === 'MIDTERM') {
           hasMidterm = true
           midtermScore = total
         } else {
@@ -162,16 +179,16 @@ export default function Onboarding() {
       }
     }
 
-    return { hasPrelim, prelimScore, hasMidterm, midtermScore, registeredEmail }
-  }, [allRecords, activeStudentName])
-
-  useEffect(() => {
-    if (studentMode === 'existing' || studentStatus.hasPrelim) {
-      setSelectedExamType('MIDTERM')
-    } else {
-      setSelectedExamType('PRELIM')
+    return {
+      hasPrelim,
+      prelimScore,
+      hasMidterm,
+      midtermScore,
+      hasPrefinal,
+      prefinalScore,
+      registeredEmail
     }
-  }, [studentMode, studentStatus.hasPrelim])
+  }, [allRecords, activeStudentName])
 
   const handleSendOtp = async () => {
     setErrorMsg('')
@@ -206,6 +223,7 @@ export default function Onboarding() {
       const data = await res.json()
       if (!res.ok) {
         setErrorMsg(data.error || 'Failed to send verification code.')
+        if (res.status === 503) setShowManualOtp(true)
         setSendingOtp(false)
         return
       }
@@ -258,7 +276,7 @@ export default function Onboarding() {
     }
   }
 
-  const handleStartExam = async () => {
+  const handleStartExam = () => {
     setErrorMsg('')
 
     if (!activeStudentName || !isEmailVerified) {
@@ -266,14 +284,14 @@ export default function Onboarding() {
       return
     }
 
-    if (selectedExamType === 'PRELIM' && studentStatus.hasPrelim) {
-      setErrorMsg('Prelim already completed. Please take the Midterm exam.')
-      setSelectedExamType('MIDTERM')
+    if (selectedExamType !== 'PREFINAL') {
+      setErrorMsg('Prelim and Midterm exams are closed. Please take the Pre-Final exam.')
+      setSelectedExamType('PREFINAL')
       return
     }
 
-    if (selectedExamType === 'MIDTERM' && studentStatus.hasMidterm) {
-      setErrorMsg('You have already submitted the Midterm examination.')
+    if (studentStatus.hasPrefinal) {
+      setErrorMsg('You have already submitted the Pre-Final examination.')
       return
     }
 
@@ -291,7 +309,7 @@ export default function Onboarding() {
 
     try {
       if (document.documentElement.requestFullscreen) {
-        await document.documentElement.requestFullscreen()
+        document.documentElement.requestFullscreen().catch(() => {})
       }
     } catch (err) {
       console.warn('Fullscreen request failed', err)
@@ -301,25 +319,31 @@ export default function Onboarding() {
   }
 
   return (
-    <main className="min-h-screen bg-neutral-50 flex flex-col items-center justify-center p-4 sm:p-6 relative">
-      {/* Fixed Check Scoreboard Button */}
+    <main className="min-h-screen flex flex-col items-center justify-center p-4 sm:p-6 relative">
+      {/* Fixed Floating Glass Scoreboard Pill */}
       <Link
         href="/view-score"
-        className="fixed top-5 right-5 z-50 flex items-center space-x-2 text-xs sm:text-sm font-medium text-neutral-600 hover:text-neutral-900 transition-colors bg-white/95 backdrop-blur-xs px-3.5 py-2 rounded-full border border-neutral-200 shadow-xs"
+        className="fixed top-5 right-5 z-50 liquid-glass-bar flex items-center space-x-2 text-xs sm:text-sm font-medium text-[#515154] hover:text-[#1d1d1f] px-4 py-2 rounded-full liquid-transition active:scale-[0.98]"
       >
         <Search className="w-3.5 h-3.5" />
         <span>Check Score</span>
       </Link>
 
-      {/* Compact Wizard Card */}
-      <div className="w-full max-w-md bg-white border border-neutral-200 rounded-xl shadow-xs p-6 sm:p-7 flex flex-col justify-between">
+      {/* Compact Liquid Glass Wizard Card */}
+      <div
+        className={`w-full ${
+          step === 3 ? 'max-w-xl' : 'max-w-md'
+        } liquid-glass rounded-3xl p-6 sm:p-8 flex flex-col justify-between transition-[max-width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]`}
+      >
         {/* Card Header */}
-        <div className="flex flex-col items-center text-center space-y-1.5 mb-5">
-          <div className="h-10 w-10 bg-neutral-100 border border-neutral-200 rounded-full flex items-center justify-center mb-1">
-            <ShieldCheck className="w-5 h-5 text-neutral-700" />
+        <div className="flex flex-col items-center text-center space-y-1.5 mb-6">
+          <div className="h-11 w-11 bg-black/[0.04] border border-black/[0.07] rounded-2xl flex items-center justify-center mb-1.5">
+            <ShieldCheck className="w-5 h-5 text-[#1d1d1f]" />
           </div>
-          <h1 className="text-xl font-semibold tracking-tight text-neutral-900">Online Examination</h1>
-          <p className="text-xs text-neutral-500">
+          <h1 className="text-xl sm:text-2xl font-semibold tracking-[-0.025em] text-[#1d1d1f]">
+            Online Examination
+          </h1>
+          <p className="text-xs sm:text-[13px] text-[#515154]">
             {step === 1 && 'Select your student profile type and section.'}
             {step === 2 && 'Verify your name and school email (.edu.ph).'}
             {step === 3 && 'Choose your examination period to begin.'}
@@ -328,9 +352,9 @@ export default function Onboarding() {
 
         {/* STEP 1: STUDENT TYPE & SECTION */}
         {step === 1 && (
-          <div className="flex flex-col space-y-4">
+          <div key="step-1" className="flex flex-col space-y-4 animate-liquid-enter">
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-neutral-600">Student Status</label>
+              <label className="text-xs font-medium text-[#515154]">Student Status</label>
               <div className="grid grid-cols-2 gap-2.5">
                 <button
                   type="button"
@@ -338,19 +362,19 @@ export default function Onboarding() {
                     setStudentMode('existing')
                     setErrorMsg('')
                   }}
-                  className={`p-3.5 rounded-lg border text-left transition-all ${
+                  className={`p-3.5 rounded-2xl border text-left liquid-transition active:scale-[0.985] ${
                     studentMode === 'existing'
-                      ? 'border-neutral-900 bg-neutral-900 text-white'
-                      : 'border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300'
+                      ? 'border-[#1d1d1f] bg-[#1d1d1f] text-white shadow-sm'
+                      : 'border-black/[0.08] bg-white/75 text-[#1d1d1f] hover:bg-white hover:border-black/20'
                   }`}
                 >
                   <div className="text-sm font-semibold">Existing Student</div>
                   <div
                     className={`text-[11px] mt-0.5 ${
-                      studentMode === 'existing' ? 'text-neutral-300' : 'text-neutral-400'
+                      studentMode === 'existing' ? 'text-white/70' : 'text-[#6e6e73]'
                     }`}
                   >
-                    Already took Prelim
+                    Took a previous exam
                   </div>
                 </button>
 
@@ -360,16 +384,16 @@ export default function Onboarding() {
                     setStudentMode('new')
                     setErrorMsg('')
                   }}
-                  className={`p-3.5 rounded-lg border text-left transition-all ${
+                  className={`p-3.5 rounded-2xl border text-left liquid-transition active:scale-[0.985] ${
                     studentMode === 'new'
-                      ? 'border-neutral-900 bg-neutral-900 text-white'
-                      : 'border-neutral-200 bg-white text-neutral-700 hover:border-neutral-300'
+                      ? 'border-[#1d1d1f] bg-[#1d1d1f] text-white shadow-sm'
+                      : 'border-black/[0.08] bg-white/75 text-[#1d1d1f] hover:bg-white hover:border-black/20'
                   }`}
                 >
                   <div className="text-sm font-semibold">New Student</div>
                   <div
                     className={`text-[11px] mt-0.5 ${
-                      studentMode === 'new' ? 'text-neutral-300' : 'text-neutral-400'
+                      studentMode === 'new' ? 'text-white/70' : 'text-[#6e6e73]'
                     }`}
                   >
                     First time user
@@ -379,8 +403,8 @@ export default function Onboarding() {
             </div>
 
             <div className="space-y-1.5">
-              <label className="text-xs font-medium text-neutral-600">Section</label>
-              <div className="grid grid-cols-2 gap-2.5">
+              <label className="text-xs font-medium text-[#515154]">Section</label>
+              <div className="grid grid-cols-2 gap-2.5 bg-black/[0.04] p-1 rounded-2xl border border-black/[0.05]">
                 {['BSIT 2-A', 'BSIT 2-B'].map((sec) => (
                   <button
                     key={sec}
@@ -389,10 +413,10 @@ export default function Onboarding() {
                       setSection(sec)
                       setSelectedExistingName('')
                     }}
-                    className={`py-2.5 px-3 rounded-lg border text-xs font-semibold transition-all ${
+                    className={`py-2 px-3 rounded-xl text-xs font-semibold liquid-transition ${
                       section === sec
-                        ? 'border-neutral-900 bg-neutral-100 text-neutral-900'
-                        : 'border-neutral-200 bg-white text-neutral-600 hover:border-neutral-300'
+                        ? 'bg-white text-[#1d1d1f] shadow-xs'
+                        : 'text-[#515154] hover:text-[#1d1d1f]'
                     }`}
                   >
                     {sec}
@@ -407,7 +431,7 @@ export default function Onboarding() {
                 setErrorMsg('')
                 setStep(2)
               }}
-              className="mt-1 w-full flex items-center justify-center space-x-1.5 py-2.5 px-4 bg-neutral-900 text-white rounded-lg text-sm font-medium hover:bg-neutral-800 transition-colors"
+              className="mt-1 w-full flex items-center justify-center space-x-1.5 py-2.5 px-4 bg-[#0071e3] text-white rounded-xl text-sm font-medium hover:bg-[#0077ed] active:scale-[0.985] liquid-transition shadow-xs"
             >
               <span>Continue</span>
               <ChevronRight className="w-4 h-4" />
@@ -417,25 +441,31 @@ export default function Onboarding() {
 
         {/* STEP 2: NAME & SCHOOL EMAIL OTP */}
         {step === 2 && (
-          <div className="flex flex-col space-y-4">
+          <div key="step-2" className="flex flex-col space-y-4 animate-liquid-enter">
             {studentMode === 'existing' ? (
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
-                  <label className="text-xs font-medium text-neutral-600">Select Your Name ({section})</label>
-                  <span className="text-[11px] text-neutral-400">{sectionStudents.length} listed</span>
+                  <label className="text-xs font-medium text-[#515154]">
+                    Select Your Name ({section})
+                  </label>
+                  <span className="text-[11px] text-[#6e6e73] tabular-nums">
+                    {sectionStudents.length} listed
+                  </span>
                 </div>
                 <input
                   type="text"
                   value={existingFilter}
                   onChange={(e) => setExistingFilter(e.target.value.toUpperCase())}
-                  placeholder="SEARCH NAME..."
-                  className="w-full px-3 py-1.5 border border-neutral-200 rounded-lg text-xs uppercase bg-neutral-50 focus:bg-white focus:outline-none focus:ring-1 focus:ring-neutral-900"
+                  placeholder="Search name"
+                  className="w-full px-3.5 py-2 border border-black/[0.1] rounded-xl text-xs uppercase bg-white/75 focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0071e3]/35 focus:border-[#0071e3] liquid-transition"
                 />
-                <div className="max-h-32 overflow-y-auto border border-neutral-200 rounded-lg divide-y divide-neutral-100">
+                <div className="max-h-36 overflow-y-auto border border-black/[0.08] bg-white/60 rounded-xl divide-y divide-black/[0.05]">
                   {loadingRecords ? (
-                    <div className="p-3 text-center text-xs text-neutral-400">Loading...</div>
+                    <div className="p-3 text-center text-xs text-[#6e6e73]">Loading students...</div>
                   ) : filteredExistingStudents.length === 0 ? (
-                    <div className="p-3 text-center text-xs text-neutral-400">No matching student found.</div>
+                    <div className="p-3 text-center text-xs text-[#6e6e73]">
+                      No matching student found.
+                    </div>
                   ) : (
                     filteredExistingStudents.map((stu) => {
                       const isSelected = selectedExistingName === stu.name
@@ -449,10 +479,10 @@ export default function Onboarding() {
                             setIsEmailVerified(false)
                             setErrorMsg('')
                           }}
-                          className={`w-full px-3 py-2 text-left text-xs flex items-center justify-between transition-colors ${
+                          className={`w-full px-3.5 py-2.5 text-left text-xs flex items-center justify-between liquid-transition ${
                             isSelected
-                              ? 'bg-neutral-900 text-white font-semibold'
-                              : 'hover:bg-neutral-50 text-neutral-800'
+                              ? 'bg-[#0071e3] text-white font-semibold'
+                              : 'hover:bg-white text-[#1d1d1f]'
                           }`}
                         >
                           <span className="truncate">{stu.name}</span>
@@ -465,7 +495,7 @@ export default function Onboarding() {
               </div>
             ) : (
               <div className="space-y-1.5">
-                <label className="text-xs font-medium text-neutral-600">Full Name (CAPSLOCK)</label>
+                <label className="text-xs font-medium text-[#515154]">Full Name (CAPSLOCK)</label>
                 <input
                   type="text"
                   value={newName}
@@ -476,14 +506,14 @@ export default function Onboarding() {
                     setErrorMsg('')
                   }}
                   placeholder="JUAN A. DELA CRUZ"
-                  className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-sm font-semibold uppercase focus:outline-none focus:ring-2 focus:ring-neutral-900"
+                  className="w-full px-3.5 py-2.5 border border-black/[0.1] bg-white/80 rounded-xl text-sm font-semibold uppercase focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0071e3]/35 focus:border-[#0071e3] liquid-transition"
                 />
               </div>
             )}
 
             {/* School Email + OTP */}
-            <div className="space-y-2 pt-1 border-t border-neutral-100">
-              <label className="text-xs font-medium text-neutral-600 block">
+            <div className="space-y-2 pt-2 border-t border-black/[0.06]">
+              <label className="text-xs font-medium text-[#515154] block">
                 School Email Verification (.edu.ph)
               </label>
               <div className="flex gap-2">
@@ -497,30 +527,40 @@ export default function Onboarding() {
                     setErrorMsg('')
                   }}
                   placeholder="name@school.edu.ph"
-                  className="flex-1 px-3 py-2 border border-neutral-300 rounded-lg text-xs focus:outline-none focus:ring-2 focus:ring-neutral-900"
+                  className="flex-1 px-3.5 py-2 border border-black/[0.1] bg-white/80 rounded-xl text-xs focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0071e3]/35 focus:border-[#0071e3] liquid-transition"
                 />
                 <button
                   type="button"
                   onClick={handleSendOtp}
                   disabled={sendingOtp || !activeStudentName || !cleanLowerEmail}
-                  className="px-3 py-2 bg-neutral-900 text-white rounded-lg text-xs font-medium hover:bg-neutral-800 disabled:bg-neutral-200 disabled:text-neutral-400 transition-colors whitespace-nowrap flex items-center space-x-1"
+                  className="px-3.5 py-2 bg-[#1d1d1f] text-white rounded-xl text-xs font-medium hover:bg-black/80 disabled:bg-black/10 disabled:text-[#6e6e73] liquid-transition whitespace-nowrap flex items-center space-x-1"
                 >
                   {sendingOtp && <RefreshCw className="w-3 h-3 animate-spin" />}
                   <span>{otpSent ? 'Resend' : 'Send Code'}</span>
                 </button>
               </div>
 
-              {otpHint && <p className="text-[11px] text-neutral-500">{otpHint}</p>}
+              {otpHint && <p className="text-[11px] text-[#515154]">{otpHint}</p>}
 
-              {otpSent && (
-                <div className="pt-1">
+              {!otpSent && !showManualOtp && (
+                <button
+                  type="button"
+                  onClick={() => setShowManualOtp(true)}
+                  className="text-[11px] font-medium text-[#515154] hover:text-[#1d1d1f] underline underline-offset-2"
+                >
+                  Already have a 6-digit instructor code?
+                </button>
+              )}
+
+              {(otpSent || showManualOtp) && (
+                <div className="pt-1 animate-liquid-enter">
                   <input
                     type="text"
                     maxLength={6}
                     value={otpCode}
                     onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
                     placeholder="Enter 6-digit code"
-                    className="w-full px-3 py-2 border border-neutral-300 rounded-lg text-xs font-mono tracking-widest text-center focus:outline-none focus:ring-2 focus:ring-neutral-900"
+                    className="w-full px-3 py-2 border border-black/[0.12] bg-white/90 rounded-xl text-xs font-mono tracking-widest text-center focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0071e3]/35 focus:border-[#0071e3] liquid-transition"
                   />
                 </div>
               )}
@@ -533,7 +573,7 @@ export default function Onboarding() {
                   setErrorMsg('')
                   setStep(1)
                 }}
-                className="px-3.5 py-2.5 border border-neutral-200 rounded-lg text-xs font-medium text-neutral-600 hover:bg-neutral-50 flex items-center space-x-1"
+                className="px-3.5 py-2.5 border border-black/[0.08] bg-white/75 rounded-xl text-xs font-medium text-[#515154] hover:bg-white hover:text-[#1d1d1f] flex items-center space-x-1 liquid-transition"
               >
                 <ChevronLeft className="w-3.5 h-3.5" />
                 <span>Back</span>
@@ -542,8 +582,8 @@ export default function Onboarding() {
               <button
                 type="button"
                 onClick={handleVerifyOtpAndContinue}
-                disabled={!otpSent || otpCode.length < 6 || verifyingOtp}
-                className="flex-1 flex items-center justify-center space-x-1.5 py-2.5 px-4 bg-neutral-900 text-white rounded-lg text-xs font-medium hover:bg-neutral-800 disabled:bg-neutral-200 disabled:text-neutral-400 transition-colors"
+                disabled={otpCode.length < 6 || verifyingOtp}
+                className="flex-1 flex items-center justify-center space-x-1.5 py-2.5 px-4 bg-[#0071e3] text-white rounded-xl text-xs font-semibold hover:bg-[#0077ed] active:scale-[0.985] disabled:bg-black/10 disabled:text-[#6e6e73] liquid-transition shadow-xs"
               >
                 <span>{verifyingOtp ? 'Verifying...' : 'Verify & Continue'}</span>
                 <ChevronRight className="w-3.5 h-3.5" />
@@ -552,72 +592,85 @@ export default function Onboarding() {
           </div>
         )}
 
-        {/* STEP 3: EXAM SELECTION CARDS (PRELIM VS MIDTERM) */}
+        {/* STEP 3: EXAM SELECTION CARDS (PRELIM, MIDTERM LOCKED; PREFINAL ACTIVE) */}
         {step === 3 && (
-          <div className="flex flex-col space-y-4">
-            <div className="px-3 py-2 bg-neutral-50 border border-neutral-200 rounded-lg flex items-center justify-between text-xs">
-              <span className="font-semibold text-neutral-900 truncate">{activeStudentName}</span>
-              <span className="text-neutral-500 shrink-0 ml-2">{section}</span>
+          <div key="step-3" className="flex flex-col space-y-4 animate-liquid-enter">
+            <div className="px-3.5 py-2.5 bg-white/65 border border-black/[0.07] rounded-xl flex items-center justify-between text-xs">
+              <span className="font-semibold text-[#1d1d1f] truncate">{activeStudentName}</span>
+              <span className="text-[#515154] shrink-0 ml-2">{section}</span>
             </div>
 
-            <div className="grid grid-cols-2 gap-3">
-              {/* Prelim Card */}
+            <div className="grid grid-cols-1 sm:grid-cols-3 gap-3">
+              {/* Prelim Card (Globally Locked) */}
               <button
                 type="button"
-                disabled={studentStatus.hasPrelim}
-                onClick={() => setSelectedExamType('PRELIM')}
-                className={`p-4 rounded-xl border text-left transition-all flex flex-col justify-between ${
-                  studentStatus.hasPrelim
-                    ? 'border-neutral-200 bg-neutral-50 text-neutral-400 cursor-not-allowed'
-                    : selectedExamType === 'PRELIM'
-                    ? 'border-neutral-900 bg-neutral-900 text-white'
-                    : 'border-neutral-200 bg-white text-neutral-800 hover:border-neutral-400'
-                }`}
+                disabled
+                className="p-4 rounded-2xl border border-black/[0.06] bg-white/40 text-[#6e6e73] cursor-not-allowed text-left flex flex-col justify-between"
               >
                 <div className="space-y-1">
-                  <div className="flex items-center justify-between text-[11px] font-medium opacity-75">
-                    <span>PRELIM</span>
-                    {studentStatus.hasPrelim && <Lock className="w-3 h-3" />}
+                  <div className="flex items-center justify-between text-[11px] font-medium">
+                    <span>Prelim</span>
+                    <Lock className="w-3 h-3" />
                   </div>
-                  <div className="text-sm font-semibold leading-snug">Multimedia Systems</div>
-                  <div className="text-[11px] opacity-70">40 MCQ • 10 Essay</div>
+                  <div className="text-sm font-semibold text-[#515154] leading-snug">
+                    Multimedia Systems
+                  </div>
+                  <div className="text-[11px]">40 MCQ · 10 Essay</div>
                 </div>
 
-                <div className="mt-4 pt-2 border-t border-current/10 text-[11px] font-medium">
-                  {studentStatus.hasPrelim
-                    ? `Done (${studentStatus.prelimScore}/50)`
-                    : selectedExamType === 'PRELIM'
-                    ? 'Selected'
-                    : 'Select'}
+                <div className="mt-4 pt-2 border-t border-black/[0.06] text-[11px] font-medium tabular-nums">
+                  {studentStatus.hasPrelim ? `Done (${studentStatus.prelimScore}/50)` : 'Closed'}
                 </div>
               </button>
 
-              {/* Midterm Card */}
+              {/* Midterm Card (Globally Locked) */}
               <button
                 type="button"
-                disabled={studentStatus.hasMidterm}
-                onClick={() => setSelectedExamType('MIDTERM')}
-                className={`p-4 rounded-xl border text-left transition-all flex flex-col justify-between ${
-                  studentStatus.hasMidterm
-                    ? 'border-neutral-200 bg-neutral-50 text-neutral-400 cursor-not-allowed'
-                    : selectedExamType === 'MIDTERM'
-                    ? 'border-neutral-900 bg-neutral-900 text-white'
-                    : 'border-neutral-200 bg-white text-neutral-800 hover:border-neutral-400'
+                disabled
+                className="p-4 rounded-2xl border border-black/[0.06] bg-white/40 text-[#6e6e73] cursor-not-allowed text-left flex flex-col justify-between"
+              >
+                <div className="space-y-1">
+                  <div className="flex items-center justify-between text-[11px] font-medium">
+                    <span>Midterm</span>
+                    <Lock className="w-3 h-3" />
+                  </div>
+                  <div className="text-sm font-semibold text-[#515154] leading-snug">
+                    UX & AI Workflows
+                  </div>
+                  <div className="text-[11px]">30 MCQ · 10 UI · 10 Essay</div>
+                </div>
+
+                <div className="mt-4 pt-2 border-t border-black/[0.06] text-[11px] font-medium tabular-nums">
+                  {studentStatus.hasMidterm ? `Done (${studentStatus.midtermScore}/50)` : 'Closed'}
+                </div>
+              </button>
+
+              {/* Pre-Final Card */}
+              <button
+                type="button"
+                disabled={studentStatus.hasPrefinal}
+                onClick={() => setSelectedExamType('PREFINAL')}
+                className={`p-4 rounded-2xl border text-left liquid-transition active:scale-[0.985] flex flex-col justify-between ${
+                  studentStatus.hasPrefinal
+                    ? 'border-black/[0.06] bg-white/40 text-[#6e6e73] cursor-not-allowed'
+                    : selectedExamType === 'PREFINAL'
+                    ? 'border-[#0071e3] bg-[#0071e3] text-white shadow-[0_10px_24px_-8px_rgba(0,113,227,0.45)]'
+                    : 'border-black/[0.1] bg-white/85 text-[#1d1d1f] hover:bg-white hover:border-black/20'
                 }`}
               >
                 <div className="space-y-1">
-                  <div className="flex items-center justify-between text-[11px] font-medium opacity-75">
-                    <span>MIDTERM</span>
-                    {studentStatus.hasMidterm && <Lock className="w-3 h-3" />}
+                  <div className="flex items-center justify-between text-[11px] font-medium opacity-85">
+                    <span>Pre-Final</span>
+                    {studentStatus.hasPrefinal && <Lock className="w-3 h-3" />}
                   </div>
-                  <div className="text-sm font-semibold leading-snug">UX & AI Workflows</div>
-                  <div className="text-[11px] opacity-70">30 MCQ • 10 UI • 10 Essay</div>
+                  <div className="text-sm font-semibold leading-snug">Multimedia, UX & AI</div>
+                  <div className="text-[11px] opacity-80">30 MCQ · 10 Audit · 10 Essay</div>
                 </div>
 
-                <div className="mt-4 pt-2 border-t border-current/10 text-[11px] font-medium">
-                  {studentStatus.hasMidterm
-                    ? `Done (${studentStatus.midtermScore}/50)`
-                    : selectedExamType === 'MIDTERM'
+                <div className="mt-4 pt-2 border-t border-current/15 text-[11px] font-medium tabular-nums">
+                  {studentStatus.hasPrefinal
+                    ? `Done (${studentStatus.prefinalScore}/50)`
+                    : selectedExamType === 'PREFINAL'
                     ? 'Selected'
                     : 'Select'}
                 </div>
@@ -631,7 +684,7 @@ export default function Onboarding() {
                   setErrorMsg('')
                   setStep(2)
                 }}
-                className="px-3.5 py-2.5 border border-neutral-200 rounded-lg text-xs font-medium text-neutral-600 hover:bg-neutral-50 flex items-center space-x-1"
+                className="px-3.5 py-2.5 border border-black/[0.08] bg-white/75 rounded-xl text-xs font-medium text-[#515154] hover:bg-white hover:text-[#1d1d1f] flex items-center space-x-1 liquid-transition"
               >
                 <ChevronLeft className="w-3.5 h-3.5" />
                 <span>Back</span>
@@ -640,13 +693,10 @@ export default function Onboarding() {
               <button
                 type="button"
                 onClick={handleStartExam}
-                disabled={
-                  (selectedExamType === 'MIDTERM' && studentStatus.hasMidterm) ||
-                  (selectedExamType === 'PRELIM' && studentStatus.hasPrelim)
-                }
-                className="flex-1 flex items-center justify-center space-x-1.5 py-2.5 px-4 bg-neutral-900 text-white rounded-lg text-xs font-medium hover:bg-neutral-800 disabled:bg-neutral-200 disabled:text-neutral-400 transition-colors"
+                disabled={selectedExamType !== 'PREFINAL' || studentStatus.hasPrefinal}
+                className="flex-1 flex items-center justify-center space-x-1.5 py-2.5 px-4 bg-[#1d1d1f] text-white rounded-xl text-xs font-semibold hover:bg-black/85 active:scale-[0.985] disabled:bg-black/10 disabled:text-[#6e6e73] liquid-transition shadow-xs"
               >
-                <span>Start {selectedExamType === 'MIDTERM' ? 'Midterm' : 'Prelim'} Exam</span>
+                <span>Start Pre-Final Exam</span>
                 <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>
@@ -655,19 +705,19 @@ export default function Onboarding() {
 
         {/* Error Feedback */}
         {errorMsg && (
-          <p className="text-red-600 text-xs font-medium text-center mt-3 bg-red-50 border border-red-100 rounded-lg py-2 px-3">
+          <p className="text-red-700 text-xs font-medium text-center mt-3 bg-red-500/10 border border-red-500/20 rounded-xl py-2 px-3">
             {errorMsg}
           </p>
         )}
 
         {/* Step Dot Indicators */}
-        <div className="pt-5 mt-5 border-t border-neutral-100 flex items-center justify-between">
+        <div className="pt-5 mt-6 border-t border-black/[0.06] flex items-center justify-between">
           <div className="flex items-center space-x-1.5 mx-auto">
             {[1, 2, 3].map((dot) => (
               <span
                 key={dot}
-                className={`h-1.5 rounded-full transition-all duration-300 ${
-                  step === dot ? 'w-5 bg-neutral-900' : 'w-1.5 bg-neutral-200'
+                className={`h-1.5 rounded-full transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                  step === dot ? 'w-6 bg-[#1d1d1f]' : 'w-1.5 bg-black/15'
                 }`}
               />
             ))}

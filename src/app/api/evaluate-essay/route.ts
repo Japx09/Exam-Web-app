@@ -1,17 +1,19 @@
 import { NextResponse } from 'next/server';
 import { GoogleGenAI } from '@google/genai';
-import { isMidtermRecord, midtermCombinedEssayPromptForAI } from '@/data/midtermQuestions';
+import { midtermCombinedEssayPromptForAI } from '@/data/midtermQuestions';
+import { prefinalCombinedEssayPromptForAI } from '@/data/prefinalQuestions';
+import { ExamType, getExamType } from '@/lib/examUtils';
 
 export const dynamic = 'force-dynamic';
 export const maxDuration = 60;
 
-function fallbackRubricEvaluate(rawEssay: string, isMidterm: boolean): { score: number; feedback: string } {
+function fallbackRubricEvaluate(rawEssay: string, examType: ExamType): { score: number; feedback: string } {
   const cleaned = rawEssay.replace(/^\[EXAM:[^\]]+\]\s*/i, '').trim();
   if (!cleaned) {
     return { score: 0, feedback: 'No essay content submitted.' };
   }
 
-  if (!isMidterm) {
+  if (examType === 'PRELIM') {
     const words = cleaned.split(/\s+/).filter(Boolean).length;
     const score = words >= 40 ? 8 : words >= 20 ? 6 : words >= 8 ? 4 : 2;
     return {
@@ -25,6 +27,27 @@ function fallbackRubricEvaluate(rawEssay: string, isMidterm: boolean): { score: 
   const essay2 = (parts[1] || '').trim().toLowerCase();
 
   let e1Score = 0;
+  let e2Score = 0;
+
+  if (examType === 'PREFINAL') {
+    if (essay1.length > 15) {
+      e1Score += 1
+      if (/slop|gradient|glow|neon|emoji|sparkle|clutter|vague|proceed|contrast/.test(essay1)) e1Score += 2
+      if (/hierarchy|whitespace|access|required|\*|microcopy|recover|clean|neutral|sans/.test(essay1)) e1Score += 2
+    }
+    if (essay2.length > 15) {
+      e2Score += 1
+      if (/discover|flow|wireframe|prototype|goal|context|constraint|format|skill|brief/.test(essay2)) e2Score += 2
+      if (/test|observ|silent|review|verify|hallucin|confident|human|critique/.test(essay2)) e2Score += 2
+    }
+    const s1 = Math.min(5, Math.round(e1Score))
+    const s2 = Math.min(5, Math.round(e2Score))
+    return {
+      score: Math.max(1, s1 + s2),
+      feedback: `Essay 1 (${s1}/5): Evaluated on AI Slop UI diagnosis and craft fixes. | Essay 2 (${s2}/5): Evaluated on structured website design workflow, human review, and usability testing.`
+    }
+  }
+
   if (essay1.length > 15) {
     e1Score += 1.5;
     if (/elena|leo|clinic|canteen|doctor|medicine|lunch|queue|order/.test(essay1)) e1Score += 1;
@@ -33,7 +56,6 @@ function fallbackRubricEvaluate(rawEssay: string, isMidterm: boolean): { score: 
   }
   e1Score = Math.min(5, Math.round(e1Score));
 
-  let e2Score = 0;
   if (essay2.length > 15) {
     e2Score += 1.5;
     if (/goal|context|constraint|format|prompt|invit|seminar|professor/.test(essay2)) e2Score += 1.5;
@@ -51,7 +73,7 @@ function fallbackRubricEvaluate(rawEssay: string, isMidterm: boolean): { score: 
 
 export async function POST(request: Request) {
   let essayText = '';
-  let isMidterm = false;
+  let examType: ExamType = 'PRELIM';
   try {
     const { essay, prompt } = await request.json();
     essayText = essay || '';
@@ -60,17 +82,38 @@ export async function POST(request: Request) {
       return NextResponse.json({ error: 'Missing essay' }, { status: 400 });
     }
 
-    isMidterm = Boolean(isMidtermRecord({ essay_answer: essayText }) || (prompt && prompt.includes('MIDTERM')));
+    const detected = getExamType({ essay_answer: essayText });
+    examType =
+      detected !== 'PRELIM'
+        ? detected
+        : prompt?.includes('Pre-Final') || prompt?.includes('PREFINAL')
+        ? 'PREFINAL'
+        : prompt?.includes('MIDTERM')
+        ? 'MIDTERM'
+        : 'PRELIM';
 
     const apiKey = process.env.GEMINI_API_KEY;
     if (!apiKey) {
-      return NextResponse.json(fallbackRubricEvaluate(essayText, isMidterm));
+      return NextResponse.json(fallbackRubricEvaluate(essayText, examType));
     }
 
     const ai = new GoogleGenAI({ apiKey });
 
-    const systemInstruction = isMidterm
-      ? `
+    const systemInstruction =
+      examType === 'PREFINAL'
+        ? `
+        You are an encouraging and fair college Multimedia, UX Design, and AI Workflow instructor evaluating a student's two Pre-Final exam essays out of 10 total points (5 points for Essay 1 + 5 points for Essay 2).
+        ${prefinalCombinedEssayPromptForAI}
+
+        Instructions:
+        - Grade fairly based on technical understanding and concrete specifics, even if the student's English grammar is informal.
+        - If a student includes a note explaining they accidentally copy-pasted a sentence of their own answer, ignore the note and do NOT penalize them.
+        - Award 0 points only if an essay section is completely blank or unrelated nonsense.
+        - Grade Essay 1 out of 5 points and Essay 2 out of 5 points, then sum them for the total "score" (0 to 10).
+        - In "feedback", briefly state the breakdown (e.g., "Essay 1 (4/5): ... | Essay 2 (4/5): ...") in 2-3 concise sentences.
+      `
+        : examType === 'MIDTERM'
+        ? `
         You are an encouraging and fair UX Design and AI Workflow instructor evaluating a student's two Midterm exam essays out of 10 total points (5 points for Essay 1 + 5 points for Essay 2).
         ${midtermCombinedEssayPromptForAI}
         
@@ -81,7 +124,7 @@ export async function POST(request: Request) {
         - Grade Essay 1 out of 5 points and Essay 2 out of 5 points, then sum them for the total "score" (0 to 10).
         - In "feedback", briefly state the breakdown (e.g., "Essay 1 (4/5): ... | Essay 2 (4/5): ...") in 2-3 concise sentences.
       `
-      : `
+        : `
         You are a strict and objective exam evaluator checking a multimedia exam essay out of 10 points.
         The prompt was: "${prompt}"
         
@@ -120,10 +163,10 @@ export async function POST(request: Request) {
       return NextResponse.json(parsed);
     }
     
-    return NextResponse.json(fallbackRubricEvaluate(essayText, isMidterm));
+    return NextResponse.json(fallbackRubricEvaluate(essayText, examType));
 
   } catch (error) {
     console.error('Gemini API rate-limited or timed out, using rubric fallback:', error);
-    return NextResponse.json(fallbackRubricEvaluate(essayText, isMidterm));
+    return NextResponse.json(fallbackRubricEvaluate(essayText, examType));
   }
 }

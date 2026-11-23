@@ -1,6 +1,6 @@
 'use client'
 
-import React, { useState, useEffect, useMemo } from 'react'
+import React, { useState, useEffect, useMemo, useCallback } from 'react'
 import {
   Search,
   ChevronLeft,
@@ -10,7 +10,7 @@ import {
   AlertCircle
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { parseExamDetails } from '@/data/midtermQuestions'
+import { ExamType, parseExamDetails } from '@/lib/examUtils'
 import Link from 'next/link'
 
 interface ExamRecord {
@@ -26,18 +26,37 @@ interface ExamRecord {
   created_at: string
 }
 
+type SortOption = 'name-asc' | 'name-desc' | 'score-desc' | 'score-asc'
+
 export default function ViewScore() {
   const [exams, setExams] = useState<ExamRecord[]>([])
   const [loading, setLoading] = useState(true)
   const [error, setError] = useState('')
   const [activeTab, setActiveTab] = useState<'BSIT 2-A' | 'BSIT 2-B' | 'ALL'>('BSIT 2-A')
-  const [examPeriodFilter, setExamPeriodFilter] = useState<'ALL' | 'PRELIM' | 'MIDTERM'>('ALL')
+  const [examPeriodFilter, setExamPeriodFilter] = useState<'ALL' | ExamType>('ALL')
   const [searchQuery, setSearchQuery] = useState('')
-  const [sortBy, setSortBy] = useState<'name-asc' | 'name-desc' | 'score-desc' | 'score-asc'>('name-asc')
+  const [sortBy, setSortBy] = useState<SortOption>('name-asc')
   const [expandedRow, setExpandedRow] = useState<string | null>(null)
 
+  const fetchScores = useCallback(async () => {
+    try {
+      const { data, error: fetchError } = await supabase
+        .from('exams')
+        .select('*')
+        .order('student_name', { ascending: true })
+
+      if (fetchError) throw fetchError
+      setExams(data || [])
+    } catch (err) {
+      console.error(err)
+      setError('Failed to load scores. Please refresh.')
+    } finally {
+      setLoading(false)
+    }
+  }, [])
+
   useEffect(() => {
-    fetchScores()
+    Promise.resolve().then(() => fetchScores())
 
     const channel = supabase
       .channel('public:exams:view-score')
@@ -49,25 +68,7 @@ export default function ViewScore() {
     return () => {
       supabase.removeChannel(channel)
     }
-  }, [])
-
-  const fetchScores = async () => {
-    try {
-      setLoading(true)
-      const { data, error } = await supabase
-        .from('exams')
-        .select('*')
-        .order('student_name', { ascending: true })
-
-      if (error) throw error
-      setExams(data || [])
-    } catch (err: any) {
-      console.error(err)
-      setError('Failed to load scores. Please refresh.')
-    } finally {
-      setLoading(false)
-    }
-  }
+  }, [fetchScores])
 
   const filteredAndSortedExams = useMemo(() => {
     return exams
@@ -109,6 +110,7 @@ export default function ViewScore() {
       ).length,
     [exams, examPeriodFilter]
   )
+
   const countSectionB = useMemo(
     () =>
       exams.filter(
@@ -124,31 +126,37 @@ export default function ViewScore() {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-50 text-neutral-900 pb-16">
-      {/* Fixed/Sticky Top Header & Filter Controls */}
-      <div className="border-b border-neutral-200 bg-white/95 backdrop-blur-xs sticky top-0 z-30">
+    <div className="min-h-screen text-[#1d1d1f] pb-16">
+      {/* Sticky Liquid Glass Header & Filter Controls */}
+      <div className="sticky top-0 z-30 border-b border-black/[0.07] bg-white/75 backdrop-blur-xl backdrop-saturate-180">
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3.5 flex flex-col gap-3">
-          <div className="flex items-center justify-between">
+          <div className="flex items-center justify-between gap-3">
             <Link
               href="/"
-              className="flex items-center space-x-1.5 text-xs sm:text-sm font-medium text-neutral-500 hover:text-neutral-900 transition-colors"
+              className="flex items-center space-x-1.5 text-xs sm:text-sm font-medium text-[#515154] hover:text-[#1d1d1f] liquid-transition"
             >
               <ChevronLeft className="w-4 h-4" />
               <span>Back to Home</span>
             </Link>
 
-            <div className="flex items-center space-x-1 bg-neutral-100 p-1 rounded-lg">
-              {(['ALL', 'PRELIM', 'MIDTERM'] as const).map((period) => (
+            <div className="flex items-center space-x-1 bg-black/[0.045] p-1 rounded-xl border border-black/[0.05]">
+              {(['ALL', 'PRELIM', 'MIDTERM', 'PREFINAL'] as const).map((period) => (
                 <button
                   key={period}
                   onClick={() => setExamPeriodFilter(period)}
-                  className={`px-2.5 py-1 rounded-md text-xs font-medium transition-all ${
+                  className={`px-2.5 py-1 rounded-lg text-xs font-medium liquid-transition ${
                     examPeriodFilter === period
-                      ? 'bg-white text-neutral-900 shadow-2xs'
-                      : 'text-neutral-600 hover:text-neutral-900'
+                      ? 'bg-white text-[#1d1d1f] shadow-xs'
+                      : 'text-[#515154] hover:text-[#1d1d1f]'
                   }`}
                 >
-                  {period === 'ALL' ? 'All' : period === 'PRELIM' ? 'Prelim' : 'Midterm'}
+                  {period === 'ALL'
+                    ? 'All'
+                    : period === 'PRELIM'
+                    ? 'Prelim'
+                    : period === 'MIDTERM'
+                    ? 'Midterm'
+                    : 'Pre-Final'}
                 </button>
               ))}
             </div>
@@ -156,70 +164,72 @@ export default function ViewScore() {
 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
             {/* Section Tabs */}
-            <div className="flex items-center space-x-1 bg-neutral-100 p-1 rounded-lg w-fit">
+            <div className="flex items-center space-x-1 bg-black/[0.045] p-1 rounded-xl border border-black/[0.05] w-fit">
               <button
                 onClick={() => setActiveTab('BSIT 2-A')}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center space-x-1.5 ${
+                className={`px-3 py-1.5 text-xs font-medium rounded-lg liquid-transition flex items-center space-x-1.5 ${
                   activeTab === 'BSIT 2-A'
-                    ? 'bg-white text-neutral-900 shadow-2xs'
-                    : 'text-neutral-600 hover:text-neutral-900'
+                    ? 'bg-white text-[#1d1d1f] shadow-xs'
+                    : 'text-[#515154] hover:text-[#1d1d1f]'
                 }`}
               >
                 <span>BSIT 2-A</span>
-                <span className="text-[11px] text-neutral-400">({countSectionA})</span>
+                <span className="text-[11px] text-[#6e6e73] tabular-nums">({countSectionA})</span>
               </button>
 
               <button
                 onClick={() => setActiveTab('BSIT 2-B')}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center space-x-1.5 ${
+                className={`px-3 py-1.5 text-xs font-medium rounded-lg liquid-transition flex items-center space-x-1.5 ${
                   activeTab === 'BSIT 2-B'
-                    ? 'bg-white text-neutral-900 shadow-2xs'
-                    : 'text-neutral-600 hover:text-neutral-900'
+                    ? 'bg-white text-[#1d1d1f] shadow-xs'
+                    : 'text-[#515154] hover:text-[#1d1d1f]'
                 }`}
               >
                 <span>BSIT 2-B</span>
-                <span className="text-[11px] text-neutral-400">({countSectionB})</span>
+                <span className="text-[11px] text-[#6e6e73] tabular-nums">({countSectionB})</span>
               </button>
 
               <button
                 onClick={() => setActiveTab('ALL')}
-                className={`px-3 py-1.5 text-xs font-medium rounded-md transition-all flex items-center space-x-1.5 ${
+                className={`px-3 py-1.5 text-xs font-medium rounded-lg liquid-transition flex items-center space-x-1.5 ${
                   activeTab === 'ALL'
-                    ? 'bg-white text-neutral-900 shadow-2xs'
-                    : 'text-neutral-600 hover:text-neutral-900'
+                    ? 'bg-white text-[#1d1d1f] shadow-xs'
+                    : 'text-[#515154] hover:text-[#1d1d1f]'
                 }`}
               >
                 <span>All</span>
-                <span className="text-[11px] text-neutral-400">({countSectionA + countSectionB})</span>
+                <span className="text-[11px] text-[#6e6e73] tabular-nums">
+                  ({countSectionA + countSectionB})
+                </span>
               </button>
             </div>
 
             {/* Search & Sort */}
             <div className="flex items-center gap-2">
               <div className="relative flex-1 sm:flex-initial">
-                <Search className="w-3.5 h-3.5 text-neutral-400 absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
+                <Search className="w-3.5 h-3.5 text-[#6e6e73] absolute left-3 top-1/2 -translate-y-1/2 pointer-events-none" />
                 <input
                   type="text"
-                  placeholder="SEARCH NAME..."
+                  placeholder="Search name"
                   value={searchQuery}
                   onChange={(e) => setSearchQuery(e.target.value.toUpperCase())}
-                  className="w-full sm:w-52 pl-8 pr-3 py-1.5 text-xs uppercase bg-white border border-neutral-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-neutral-900"
+                  className="w-full sm:w-52 pl-8 pr-3 py-1.5 text-xs uppercase bg-white/80 border border-black/[0.09] rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0071e3]/35 focus:border-[#0071e3] liquid-transition"
                 />
               </div>
 
               <div className="relative flex items-center">
-                <ArrowUpDown className="w-3.5 h-3.5 text-neutral-400 absolute left-2.5 pointer-events-none" />
+                <ArrowUpDown className="w-3.5 h-3.5 text-[#6e6e73] absolute left-2.5 pointer-events-none" />
                 <select
                   value={sortBy}
-                  onChange={(e) => setSortBy(e.target.value as any)}
-                  className="pl-8 pr-7 py-1.5 text-xs bg-white border border-neutral-200 rounded-lg focus:outline-none focus:ring-1 focus:ring-neutral-900 appearance-none text-neutral-700 font-medium cursor-pointer"
+                  onChange={(e) => setSortBy(e.target.value as SortOption)}
+                  className="pl-8 pr-7 py-1.5 text-xs bg-white/80 border border-black/[0.09] rounded-xl focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0071e3]/35 appearance-none text-[#1d1d1f] font-medium cursor-pointer liquid-transition"
                 >
                   <option value="name-asc">A – Z</option>
                   <option value="name-desc">Z – A</option>
                   <option value="score-desc">Highest</option>
                   <option value="score-asc">Lowest</option>
                 </select>
-                <ChevronDown className="w-3.5 h-3.5 text-neutral-400 absolute right-2 pointer-events-none" />
+                <ChevronDown className="w-3.5 h-3.5 text-[#6e6e73] absolute right-2 pointer-events-none" />
               </div>
             </div>
           </div>
@@ -228,33 +238,35 @@ export default function ViewScore() {
 
       <div className="max-w-5xl mx-auto px-4 sm:px-6 pt-6">
         {error && (
-          <div className="mb-4 p-3 rounded-lg bg-red-50 border border-red-200 flex items-center space-x-2 text-red-700 text-xs">
+          <div className="mb-4 p-3 rounded-xl bg-red-500/10 border border-red-500/20 flex items-center space-x-2 text-red-700 text-xs">
             <AlertCircle className="w-4 h-4 shrink-0" />
             <span>{error}</span>
           </div>
         )}
 
-        <div className="bg-white rounded-xl border border-neutral-200 shadow-xs overflow-hidden">
+        <div className="liquid-glass rounded-3xl overflow-hidden">
           {loading ? (
-            <div className="py-16 text-center text-xs text-neutral-400">Loading scores...</div>
+            <div className="py-16 text-center text-xs text-[#6e6e73]">Loading scores...</div>
           ) : filteredAndSortedExams.length === 0 ? (
-            <div className="py-16 text-center text-xs text-neutral-400">No matching records found.</div>
+            <div className="py-16 text-center text-xs text-[#6e6e73]">
+              No matching records found.
+            </div>
           ) : (
             <div className="overflow-x-auto">
               <table className="w-full text-left border-collapse text-sm">
                 <thead>
-                  <tr className="bg-neutral-50 border-b border-neutral-200 text-neutral-500 font-medium text-xs">
-                    <th className="py-3 px-4 w-10 text-center">#</th>
-                    <th className="py-3 px-4">Student Name</th>
-                    <th className="py-3 px-4">Period</th>
-                    {activeTab === 'ALL' && <th className="py-3 px-4">Section</th>}
-                    <th className="py-3 px-4 text-center">Objective (/40)</th>
-                    <th className="py-3 px-4 text-center">Essay (/10)</th>
-                    <th className="py-3 px-4 text-center">Total (/50)</th>
-                    <th className="py-3 px-4 w-10"></th>
+                  <tr className="bg-black/[0.025] border-b border-black/[0.06] text-[#515154] font-medium text-xs">
+                    <th className="py-3.5 px-4 w-10 text-center">#</th>
+                    <th className="py-3.5 px-4">Student Name</th>
+                    <th className="py-3.5 px-4">Period</th>
+                    {activeTab === 'ALL' && <th className="py-3.5 px-4">Section</th>}
+                    <th className="py-3.5 px-4 text-center">Objective (/40)</th>
+                    <th className="py-3.5 px-4 text-center">Essay (/10)</th>
+                    <th className="py-3.5 px-4 text-center">Total (/50)</th>
+                    <th className="py-3.5 px-4 w-10"></th>
                   </tr>
                 </thead>
-                <tbody className="divide-y divide-neutral-100">
+                <tbody className="divide-y divide-black/[0.05]">
                   {filteredAndSortedExams.map((exam, index) => {
                     const details = parseExamDetails(exam)
                     const totalScore = details.totalScore
@@ -264,40 +276,44 @@ export default function ViewScore() {
                       <React.Fragment key={exam.id}>
                         <tr
                           onClick={() => toggleRow(exam.id)}
-                          className="hover:bg-neutral-50/80 transition-colors cursor-pointer"
+                          className="hover:bg-white/60 liquid-transition cursor-pointer"
                         >
-                          <td className="py-3.5 px-4 text-center text-neutral-400 font-mono text-xs">
+                          <td className="py-3.5 px-4 text-center text-[#6e6e73] font-mono text-xs tabular-nums">
                             {index + 1}
                           </td>
-                          <td className="py-3.5 px-4 font-medium text-neutral-900 uppercase text-xs sm:text-sm">
+                          <td className="py-3.5 px-4 font-medium text-[#1d1d1f] uppercase text-xs sm:text-sm">
                             {exam.student_name.toUpperCase()}
                           </td>
                           <td className="py-3.5 px-4">
-                            <span className="inline-flex px-2 py-0.5 rounded text-[11px] font-medium bg-neutral-100 text-neutral-600">
-                              {details.examType}
+                            <span className="inline-flex px-2.5 py-0.5 rounded-md text-[11px] font-medium bg-black/[0.05] text-[#515154]">
+                              {details.examType === 'PREFINAL'
+                                ? 'Pre-Final'
+                                : details.examType === 'MIDTERM'
+                                ? 'Midterm'
+                                : 'Prelim'}
                             </span>
                           </td>
                           {activeTab === 'ALL' && (
-                            <td className="py-3.5 px-4 text-xs text-neutral-500">{exam.section}</td>
+                            <td className="py-3.5 px-4 text-xs text-[#515154]">{exam.section}</td>
                           )}
-                          <td className="py-3.5 px-4 text-center text-neutral-700 text-xs sm:text-sm">
+                          <td className="py-3.5 px-4 text-center text-[#1d1d1f] text-xs sm:text-sm tabular-nums">
                             {exam.mcq_score}
                           </td>
-                          <td className="py-3.5 px-4 text-center text-neutral-700 text-xs sm:text-sm">
+                          <td className="py-3.5 px-4 text-center text-[#1d1d1f] text-xs sm:text-sm tabular-nums">
                             {exam.ai_score !== null ? exam.ai_score : '—'}
                           </td>
                           <td className="py-3.5 px-4 text-center">
                             <span
-                              className={`inline-flex px-2 py-0.5 rounded text-xs font-semibold ${
+                              className={`inline-flex px-2.5 py-0.5 rounded-lg text-xs font-semibold tabular-nums ${
                                 totalScore >= 25
-                                  ? 'bg-green-50 text-green-700'
-                                  : 'bg-red-50 text-red-700'
+                                  ? 'bg-emerald-500/12 text-emerald-700'
+                                  : 'bg-red-500/12 text-red-700'
                               }`}
                             >
                               {totalScore} / 50
                             </span>
                           </td>
-                          <td className="py-3.5 px-4 text-right text-neutral-400">
+                          <td className="py-3.5 px-4 text-right text-[#6e6e73]">
                             {isExpanded ? (
                               <ChevronUp className="w-4 h-4" />
                             ) : (
@@ -307,16 +323,24 @@ export default function ViewScore() {
                         </tr>
 
                         {isExpanded && (
-                          <tr className="bg-neutral-50/60">
+                          <tr className="bg-white/50 animate-liquid-enter">
                             <td colSpan={activeTab === 'ALL' ? 8 : 7} className="px-5 py-3.5">
-                              <div className="text-xs text-neutral-600 space-y-1.5">
-                                {details.examType === 'MIDTERM' && details.part1Mcq !== null && (
-                                  <div className="text-neutral-500 font-medium">
-                                    Part I MCQ: {details.part1Mcq}/30 • Part II Wireframe: {details.part2Dnd}/10 • Part III Essay: {exam.ai_score ?? 0}/10
-                                  </div>
-                                )}
+                              <div className="text-xs text-[#515154] space-y-1.5">
+                                {(details.examType === 'MIDTERM' || details.examType === 'PREFINAL') &&
+                                  details.part1Mcq !== null && (
+                                    <div className="text-[#515154] font-medium tabular-nums">
+                                      Part I MCQ: {details.part1Mcq}/30 ·{' '}
+                                      {details.examType === 'PREFINAL'
+                                        ? 'Part II Design Audit'
+                                        : 'Part II Wireframe'}
+                                      : {details.part2Dnd}/10 · Part III Essay:{' '}
+                                      {exam.ai_score ?? 0}/10
+                                    </div>
+                                  )}
                                 <div>
-                                  <span className="font-semibold text-neutral-800 mr-1.5">Feedback:</span>
+                                  <span className="font-semibold text-[#1d1d1f] mr-1.5">
+                                    Feedback:
+                                  </span>
                                   <span>{exam.ai_feedback || 'No feedback available.'}</span>
                                 </div>
                               </div>

@@ -23,7 +23,7 @@ export function GlobalAntiCheat({ children }: { children: React.ReactNode }) {
   }, [])
 
   return (
-    <div className="select-none flex flex-col min-h-screen w-full bg-neutral-50 text-neutral-900">
+    <div className="select-none flex flex-col min-h-screen w-full studio-canvas text-[#1d1d1f]">
       {children}
     </div>
   )

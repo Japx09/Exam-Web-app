@@ -5,7 +5,6 @@ import { supabase } from '@/lib/supabase'
 import { Database } from '@/types/database'
 import {
   ShieldAlert,
-  CheckCircle2,
   Clock,
   Trash2,
   RefreshCw,
@@ -14,13 +13,21 @@ import {
 } from 'lucide-react'
 import { essayQuestion } from '@/data/questions'
 import {
-  isMidtermRecord,
-  parseExamDetails,
   midtermCombinedEssayPromptForAI,
-  midtermWireframeChallenges,
+  midtermWireframeChallenges
+} from '@/data/midtermQuestions'
+import {
+  prefinalCombinedEssayPromptForAI,
+  prefinalAuditSpecimens,
+  prefinalVisualPrinciples
+} from '@/data/prefinalQuestions'
+import {
+  ExamType,
+  getExamType,
+  parseExamDetails,
   WireframeDndChallenge,
   DraggableUIElement
-} from '@/data/midtermQuestions'
+} from '@/lib/examUtils'
 
 type ExamRow = Database['public']['Tables']['exams']['Row']
 
@@ -31,11 +38,14 @@ export default function AdminDashboard() {
   const [password, setPassword] = useState('')
   const [authError, setAuthError] = useState('')
   const [evaluatingId, setEvaluatingId] = useState<string | null>(null)
-  const [examFilter, setExamFilter] = useState<'ALL' | 'PRELIM' | 'MIDTERM'>('ALL')
+  const [examFilter, setExamFilter] = useState<'ALL' | ExamType>('ALL')
   const [adminView, setAdminView] = useState<'records' | 'builder' | 'otp'>('records')
 
-  // Teacher Mode: Editable Wireframe Builder State
-  const [builderChallenges, setBuilderChallenges] = useState<WireframeDndChallenge[]>(midtermWireframeChallenges)
+  // Teacher Mode: Editable Wireframe Builder State (Midterm) + Pre-Final Audit Key
+  const [builderPeriod, setBuilderPeriod] = useState<'PREFINAL' | 'MIDTERM'>('PREFINAL')
+  const [builderChallenges, setBuilderChallenges] = useState<WireframeDndChallenge[]>(
+    midtermWireframeChallenges
+  )
   const [activeBuilderIdx, setActiveBuilderIdx] = useState(0)
   const [draggedBuilderElId, setDraggedBuilderElId] = useState<string | null>(null)
 
@@ -76,13 +86,19 @@ export default function AdminDashboard() {
 
     setEvaluatingId(exam.id)
     try {
-      const isMidterm = isMidtermRecord(exam)
+      const period = getExamType(exam)
+      const prompt =
+        period === 'PREFINAL'
+          ? prefinalCombinedEssayPromptForAI
+          : period === 'MIDTERM'
+          ? midtermCombinedEssayPromptForAI
+          : essayQuestion.prompt
       const res = await fetch('/api/evaluate-essay', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         body: JSON.stringify({
           essay: exam.essay_answer,
-          prompt: isMidterm ? midtermCombinedEssayPromptForAI : essayQuestion.prompt
+          prompt
         })
       })
       const data = await res.json()
@@ -92,8 +108,7 @@ export default function AdminDashboard() {
 
       const { error } = await supabase
         .from('exams')
-        // @ts-ignore
-        .update({ ai_score: newScore, ai_feedback: newFeedback })
+        .update({ ai_score: newScore, ai_feedback: newFeedback } as never)
         .eq('id', exam.id)
 
       if (error) throw error
@@ -123,7 +138,7 @@ export default function AdminDashboard() {
 
   useEffect(() => {
     if (sessionStorage.getItem('admin_auth') === 'true') {
-      setIsAuthenticated(true)
+      Promise.resolve().then(() => setIsAuthenticated(true))
     }
   }, [])
 
@@ -219,11 +234,13 @@ export default function AdminDashboard() {
 
   if (!isAuthenticated) {
     return (
-      <div className="min-h-screen bg-neutral-50 flex flex-col items-center justify-center p-6">
-        <div className="w-full max-w-sm bg-white border border-neutral-200 rounded-xl p-8 flex flex-col items-center space-y-6 shadow-xs">
+      <div className="min-h-screen flex flex-col items-center justify-center p-6">
+        <div className="w-full max-w-sm liquid-glass rounded-3xl p-8 flex flex-col items-center space-y-6 animate-liquid-enter">
           <div className="space-y-1 text-center">
-            <h1 className="text-xl font-semibold text-neutral-900">Admin Access</h1>
-            <p className="text-sm text-neutral-500">Enter password to view records</p>
+            <h1 className="text-xl font-semibold tracking-[-0.02em] text-[#1d1d1f]">
+              Admin Access
+            </h1>
+            <p className="text-sm text-[#515154]">Enter password to view records</p>
           </div>
           <form
             onSubmit={(e) => {
@@ -243,13 +260,13 @@ export default function AdminDashboard() {
               value={password}
               onChange={(e) => setPassword(e.target.value)}
               placeholder="Password"
-              className="w-full px-4 py-2 border border-neutral-200 rounded-lg text-sm focus:outline-none focus:ring-2 focus:ring-neutral-900"
+              className="w-full px-4 py-2.5 border border-black/[0.1] bg-white/80 rounded-xl text-sm focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0071e3]/35 focus:border-[#0071e3] liquid-transition"
               autoFocus
             />
-            {authError && <p className="text-red-500 text-xs font-medium text-center">{authError}</p>}
+            {authError && <p className="text-red-600 text-xs font-medium text-center">{authError}</p>}
             <button
               type="submit"
-              className="w-full px-4 py-2 bg-neutral-900 text-white rounded-lg text-sm font-medium hover:bg-neutral-800 transition-colors"
+              className="w-full px-4 py-2.5 bg-[#0071e3] text-white rounded-xl text-sm font-semibold hover:bg-[#0077ed] active:scale-[0.985] liquid-transition"
             >
               Login
             </button>
@@ -260,43 +277,47 @@ export default function AdminDashboard() {
   }
 
   return (
-    <div className="min-h-screen bg-neutral-50 p-6 md:p-12">
+    <div className="min-h-screen p-6 md:p-10">
       <div className="max-w-6xl mx-auto space-y-6">
-        {/* Clean Minimal Header */}
-        <header className="flex flex-col md:flex-row md:items-end justify-between border-b border-neutral-200 pb-6 gap-4">
-          <div className="space-y-1">
-            <h1 className="text-2xl font-semibold tracking-tight text-neutral-900">Admin Dashboard</h1>
-            <p className="text-sm text-neutral-500">Monitor examination records and manage assessments.</p>
+        {/* Clean Liquid Glass Header */}
+        <header className="liquid-glass-bar rounded-2xl px-5 py-4 flex flex-col md:flex-row md:items-center justify-between gap-4">
+          <div className="space-y-0.5">
+            <h1 className="text-xl font-semibold tracking-[-0.02em] text-[#1d1d1f]">
+              Admin Dashboard
+            </h1>
+            <p className="text-xs sm:text-sm text-[#515154]">
+              Monitor examination records and manage assessments.
+            </p>
           </div>
 
           <div className="flex flex-wrap items-center gap-3">
-            <div className="flex items-center bg-neutral-100 p-1 rounded-lg border border-neutral-200/60">
+            <div className="flex items-center bg-black/[0.045] p-1 rounded-xl border border-black/[0.05]">
               <button
                 onClick={() => setAdminView('records')}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium liquid-transition tabular-nums ${
                   adminView === 'records'
-                    ? 'bg-white text-neutral-900 shadow-2xs'
-                    : 'text-neutral-600 hover:text-neutral-900'
+                    ? 'bg-white text-[#1d1d1f] shadow-xs'
+                    : 'text-[#515154] hover:text-[#1d1d1f]'
                 }`}
               >
                 Records ({exams.length})
               </button>
               <button
                 onClick={() => setAdminView('otp')}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium liquid-transition ${
                   adminView === 'otp'
-                    ? 'bg-white text-neutral-900 shadow-2xs'
-                    : 'text-neutral-600 hover:text-neutral-900'
+                    ? 'bg-white text-[#1d1d1f] shadow-xs'
+                    : 'text-[#515154] hover:text-[#1d1d1f]'
                 }`}
               >
                 Student OTP
               </button>
               <button
                 onClick={() => setAdminView('builder')}
-                className={`px-3 py-1.5 rounded-md text-xs font-medium transition-all ${
+                className={`px-3 py-1.5 rounded-lg text-xs font-medium liquid-transition ${
                   adminView === 'builder'
-                    ? 'bg-white text-neutral-900 shadow-2xs'
-                    : 'text-neutral-600 hover:text-neutral-900'
+                    ? 'bg-white text-[#1d1d1f] shadow-xs'
+                    : 'text-[#515154] hover:text-[#1d1d1f]'
                 }`}
               >
                 Wireframe Key
@@ -307,7 +328,7 @@ export default function AdminDashboard() {
 
         {/* VIEW 1: BACKUP OTP GENERATOR */}
         {adminView === 'otp' && (
-          <div className="max-w-md bg-white border border-neutral-200 rounded-xl p-6 shadow-xs space-y-4">
+          <div className="max-w-md liquid-glass rounded-3xl p-6 space-y-4 animate-liquid-enter">
             <div>
               <h2 className="text-base font-semibold text-neutral-900">Student Backup OTP</h2>
               <p className="text-xs text-neutral-500 mt-0.5">
@@ -362,33 +383,113 @@ export default function AdminDashboard() {
           </div>
         )}
 
-        {/* VIEW 2: TEACHER WIREFRAME BUILDER */}
+        {/* VIEW 2: TEACHER PART II ANSWER KEY */}
         {adminView === 'builder' && (
-          <div className="bg-white border border-neutral-200 rounded-xl p-6 shadow-xs space-y-6">
-            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-neutral-100 pb-4">
+          <div className="liquid-glass rounded-3xl p-6 space-y-6 animate-liquid-enter">
+            <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4 border-b border-black/[0.06] pb-4">
               <div>
-                <h2 className="text-base font-semibold text-neutral-900">Wireframe Placement Answer Key</h2>
-                <p className="text-xs text-neutral-500">
-                  Edit UI elements and drag blocks into the wireframe slots to configure the answer key.
+                <h2 className="text-base font-semibold text-[#1d1d1f]">
+                  {builderPeriod === 'PREFINAL'
+                    ? 'Pre-Final Part II Answer Key'
+                    : 'Wireframe Placement Answer Key'}
+                </h2>
+                <p className="text-xs text-[#515154]">
+                  {builderPeriod === 'PREFINAL'
+                    ? 'Good UX vs AI Slop UI classifications and Visual Design Principle keys.'
+                    : 'Edit UI elements and drag blocks into the wireframe slots to configure the answer key.'}
                 </p>
               </div>
-              <div className="flex items-center space-x-1 bg-neutral-100 p-1 rounded-lg">
-                {builderChallenges.map((ch, idx) => (
-                  <button
-                    key={ch.id}
-                    onClick={() => setActiveBuilderIdx(idx)}
-                    className={`px-3 py-1 rounded-md text-xs font-medium transition-all ${
-                      activeBuilderIdx === idx
-                        ? 'bg-white text-neutral-900 shadow-2xs'
-                        : 'text-neutral-600 hover:text-neutral-900'
-                    }`}
-                  >
-                    Challenge {idx + 1}
-                  </button>
-                ))}
+              <div className="flex flex-wrap items-center gap-2">
+                <div className="flex items-center space-x-1 bg-black/[0.045] p-1 rounded-xl border border-black/[0.05]">
+                  {(['PREFINAL', 'MIDTERM'] as const).map((period) => (
+                    <button
+                      key={period}
+                      onClick={() => {
+                        setBuilderPeriod(period)
+                        setActiveBuilderIdx(0)
+                      }}
+                      className={`px-3 py-1 rounded-lg text-xs font-medium liquid-transition ${
+                        builderPeriod === period
+                          ? 'bg-white text-[#1d1d1f] shadow-xs'
+                          : 'text-[#515154] hover:text-[#1d1d1f]'
+                      }`}
+                    >
+                      {period === 'PREFINAL' ? 'Pre-Final' : 'Midterm'}
+                    </button>
+                  ))}
+                </div>
+                {builderPeriod === 'MIDTERM' && (
+                  <div className="flex items-center space-x-1 bg-black/[0.045] p-1 rounded-xl border border-black/[0.05]">
+                    {builderChallenges.map((ch, idx) => (
+                      <button
+                        key={ch.id}
+                        onClick={() => setActiveBuilderIdx(idx)}
+                        className={`px-3 py-1 rounded-lg text-xs font-medium liquid-transition ${
+                          activeBuilderIdx === idx
+                            ? 'bg-white text-[#1d1d1f] shadow-xs'
+                            : 'text-[#515154] hover:text-[#1d1d1f]'
+                        }`}
+                      >
+                        Challenge {idx + 1}
+                      </button>
+                    ))}
+                  </div>
+                )}
               </div>
             </div>
 
+            {builderPeriod === 'PREFINAL' ? (
+              <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                <div className="space-y-3">
+                  <h3 className="text-xs font-semibold text-[#515154]">
+                    Screen 1 · Good UX vs AI Slop UI (5 pts)
+                  </h3>
+                  <div className="space-y-2.5">
+                    {prefinalAuditSpecimens.map((spec) => (
+                      <div
+                        key={spec.id}
+                        className="p-3.5 rounded-2xl bg-white/80 border border-black/[0.08] space-y-1"
+                      >
+                        <div className="flex items-center justify-between gap-2">
+                          <span className="text-xs font-semibold text-[#1d1d1f]">{spec.title}</span>
+                          <span
+                            className={`text-[11px] font-semibold px-2 py-0.5 rounded-md ${
+                              spec.correctCategory === 'GOOD_UX'
+                                ? 'bg-[#0071e3]/10 text-[#0071e3]'
+                                : 'bg-black/[0.07] text-[#1d1d1f]'
+                            }`}
+                          >
+                            {spec.correctCategory === 'GOOD_UX' ? 'Good UX' : 'AI Slop UI'}
+                          </span>
+                        </div>
+                        <p className="text-[11px] text-[#515154]">{spec.rationale}</p>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+
+                <div className="space-y-3">
+                  <h3 className="text-xs font-semibold text-[#515154]">
+                    Screen 2 · Visual Design Principles (5 pts)
+                  </h3>
+                  <div className="space-y-2.5">
+                    {prefinalVisualPrinciples.map((vp, idx) => (
+                      <div
+                        key={vp.id}
+                        className="p-3.5 rounded-2xl bg-white/80 border border-black/[0.08] flex items-center justify-between gap-3"
+                      >
+                        <span className="text-xs font-medium text-[#1d1d1f]">
+                          Item {idx + 1} ({vp.visualKey})
+                        </span>
+                        <span className="text-xs font-semibold text-[#0071e3] bg-[#0071e3]/10 px-2.5 py-0.5 rounded-md shrink-0">
+                          {vp.answer}
+                        </span>
+                      </div>
+                    ))}
+                  </div>
+                </div>
+              </div>
+            ) : (
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
               <div className="lg:col-span-7 space-y-3">
                 <div className="flex items-center justify-between">
@@ -492,6 +593,7 @@ export default function AdminDashboard() {
                 </div>
               </div>
             </div>
+            )}
           </div>
         )}
 
@@ -506,7 +608,7 @@ export default function AdminDashboard() {
             <div className="space-y-6">
               {/* Minimal Period Filter */}
               <div className="flex items-center space-x-1 bg-neutral-100 p-1 rounded-lg w-fit border border-neutral-200/60">
-                {(['ALL', 'PRELIM', 'MIDTERM'] as const).map((filter) => (
+                {(['ALL', 'PRELIM', 'MIDTERM', 'PREFINAL'] as const).map((filter) => (
                   <button
                     key={filter}
                     onClick={() => setExamFilter(filter)}
@@ -516,7 +618,13 @@ export default function AdminDashboard() {
                         : 'text-neutral-600 hover:text-neutral-900'
                     }`}
                   >
-                    {filter === 'ALL' ? 'All Exams' : filter === 'PRELIM' ? 'Prelim' : 'Midterm'}
+                    {filter === 'ALL'
+                      ? 'All Exams'
+                      : filter === 'PRELIM'
+                      ? 'Prelim'
+                      : filter === 'MIDTERM'
+                      ? 'Midterm'
+                      : 'Pre-Final'}
                   </button>
                 ))}
               </div>
@@ -525,8 +633,7 @@ export default function AdminDashboard() {
                 const sectionExams = exams.filter((e) => {
                   if (e.section !== section) return false
                   if (examFilter === 'ALL') return true
-                  const isMidterm = isMidtermRecord(e)
-                  return examFilter === 'MIDTERM' ? isMidterm : !isMidterm
+                  return getExamType(e) === examFilter
                 })
 
                 return (
@@ -536,7 +643,7 @@ export default function AdminDashboard() {
                       <span className="text-xs text-neutral-500">{sectionExams.length} records</span>
                     </div>
 
-                    <div className="bg-white border border-neutral-200 rounded-xl shadow-xs overflow-hidden">
+                    <div className="liquid-glass rounded-3xl overflow-hidden">
                       <div className="overflow-x-auto">
                         <table className="w-full text-sm text-left">
                           <thead className="bg-neutral-50 border-b border-neutral-200 text-neutral-500 text-xs font-medium">
@@ -575,16 +682,18 @@ export default function AdminDashboard() {
                                     </td>
                                     <td className="px-5 py-3.5">
                                       <span className="inline-flex px-2 py-0.5 rounded text-[11px] font-medium bg-neutral-100 text-neutral-700">
-                                        {details.examType}
+                                        {details.examType === 'PREFINAL' ? 'PRE-FINAL' : details.examType}
                                       </span>
                                     </td>
                                     <td className="px-5 py-3.5">
                                       <div className="font-medium text-neutral-900">{exam.mcq_score} / 40</div>
-                                      {details.examType === 'MIDTERM' && details.part1Mcq !== null && (
-                                        <div className="text-[11px] text-neutral-400">
-                                          {details.part1Mcq} MCQ • {details.part2Dnd} UI
-                                        </div>
-                                      )}
+                                      {(details.examType === 'MIDTERM' || details.examType === 'PREFINAL') &&
+                                        details.part1Mcq !== null && (
+                                          <div className="text-[11px] text-[#515154] tabular-nums">
+                                            {details.part1Mcq} MCQ · {details.part2Dnd}{' '}
+                                            {details.examType === 'PREFINAL' ? 'Audit' : 'UI'}
+                                          </div>
+                                        )}
                                     </td>
                                     <td className="px-5 py-3.5">
                                       <div className="flex flex-col space-y-1 max-w-xs">
@@ -646,7 +755,7 @@ export default function AdminDashboard() {
                                     <td className="px-5 py-3.5 text-right">
                                       <button
                                         onClick={() => handleDelete(exam.id)}
-                                        className="text-neutral-400 hover:text-red-600 p-1.5 rounded-md hover:bg-red-50 transition-colors"
+                                        className="text-[#515154] hover:text-red-700 p-1.5 rounded-lg hover:bg-black/[0.05] liquid-transition"
                                         title="Delete Record"
                                       >
                                         <Trash2 className="w-4 h-4" />

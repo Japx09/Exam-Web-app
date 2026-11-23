@@ -14,8 +14,8 @@ const geistMono = Geist_Mono({
 });
 
 export const metadata: Metadata = {
-  title: "Online Examination System",
-  description: "Secure anti-cheat examination platform",
+  title: "Online Examination Portal",
+  description: "Southland College multimedia, UX, and AI workflow examination portal",
 };
 
 export default function RootLayout({ children }: { children: React.ReactNode }) {
@@ -24,7 +24,7 @@ export default function RootLayout({ children }: { children: React.ReactNode }) 
       lang="en"
       className={`${geistSans.variable} ${geistMono.variable} h-full antialiased`}
     >
-      <body className="min-h-full m-0 p-0">
+      <body className="min-h-full m-0 p-0 bg-[#f5f5f7] text-[#1d1d1f]">
         <GlobalAntiCheat>
           {children}
         </GlobalAntiCheat>
