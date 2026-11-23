@@ -6,11 +6,11 @@ import {
   ChevronLeft,
   ArrowUpDown,
   ChevronDown,
-  ChevronUp,
   AlertCircle
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
 import { ExamType, parseExamDetails } from '@/lib/examUtils'
+import { LiquidSegmentedControl } from '@/components/LiquidSegmentedControl'
 import Link from 'next/link'
 
 interface ExamRecord {
@@ -37,6 +37,14 @@ export default function ViewScore() {
   const [searchQuery, setSearchQuery] = useState('')
   const [sortBy, setSortBy] = useState<SortOption>('name-asc')
   const [expandedRow, setExpandedRow] = useState<string | null>(null)
+  const [scrolled, setScrolled] = useState(false)
+
+  useEffect(() => {
+    const onScroll = () => setScrolled(window.scrollY > 8)
+    onScroll()
+    window.addEventListener('scroll', onScroll, { passive: true })
+    return () => window.removeEventListener('scroll', onScroll)
+  }, [])
 
   const fetchScores = useCallback(async () => {
     try {
@@ -127,8 +135,14 @@ export default function ViewScore() {
 
   return (
     <div className="min-h-screen text-[#1d1d1f] pb-16">
-      {/* Sticky Liquid Glass Header & Filter Controls */}
-      <div className="sticky top-0 z-30 border-b border-black/[0.07] bg-white/75 backdrop-blur-xl backdrop-saturate-180">
+      {/* Sticky Liquid Glass Header with Scroll-Linked Depth */}
+      <div
+        className={`sticky top-0 z-30 border-b liquid-transition backdrop-blur-2xl backdrop-saturate-180 ${
+          scrolled
+            ? 'bg-white/78 border-black/[0.08] shadow-[0_8px_24px_-12px_rgba(15,23,42,0.12)]'
+            : 'bg-white/55 border-black/[0.05]'
+        }`}
+      >
         <div className="max-w-5xl mx-auto px-4 sm:px-6 py-3.5 flex flex-col gap-3">
           <div className="flex items-center justify-between gap-3">
             <Link
@@ -139,70 +153,64 @@ export default function ViewScore() {
               <span>Back to Home</span>
             </Link>
 
-            <div className="flex items-center space-x-1 bg-black/[0.045] p-1 rounded-xl border border-black/[0.05]">
-              {(['ALL', 'PRELIM', 'MIDTERM', 'PREFINAL'] as const).map((period) => (
-                <button
-                  key={period}
-                  onClick={() => setExamPeriodFilter(period)}
-                  className={`px-2.5 py-1 rounded-lg text-xs font-medium liquid-transition ${
-                    examPeriodFilter === period
-                      ? 'bg-white text-[#1d1d1f] shadow-xs'
-                      : 'text-[#515154] hover:text-[#1d1d1f]'
-                  }`}
-                >
-                  {period === 'ALL'
-                    ? 'All'
-                    : period === 'PRELIM'
-                    ? 'Prelim'
-                    : period === 'MIDTERM'
-                    ? 'Midterm'
-                    : 'Pre-Final'}
-                </button>
-              ))}
-            </div>
+            <LiquidSegmentedControl
+              ariaLabel="Exam period filter"
+              size="xs"
+              value={examPeriodFilter}
+              onChange={setExamPeriodFilter}
+              options={[
+                { value: 'ALL', label: 'All' },
+                { value: 'PRELIM', label: 'Prelim' },
+                { value: 'MIDTERM', label: 'Midterm' },
+                { value: 'PREFINAL', label: 'Pre-Final' }
+              ]}
+            />
           </div>
 
           <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-2.5">
-            {/* Section Tabs */}
-            <div className="flex items-center space-x-1 bg-black/[0.045] p-1 rounded-xl border border-black/[0.05] w-fit">
-              <button
-                onClick={() => setActiveTab('BSIT 2-A')}
-                className={`px-3 py-1.5 text-xs font-medium rounded-lg liquid-transition flex items-center space-x-1.5 ${
-                  activeTab === 'BSIT 2-A'
-                    ? 'bg-white text-[#1d1d1f] shadow-xs'
-                    : 'text-[#515154] hover:text-[#1d1d1f]'
-                }`}
-              >
-                <span>BSIT 2-A</span>
-                <span className="text-[11px] text-[#6e6e73] tabular-nums">({countSectionA})</span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab('BSIT 2-B')}
-                className={`px-3 py-1.5 text-xs font-medium rounded-lg liquid-transition flex items-center space-x-1.5 ${
-                  activeTab === 'BSIT 2-B'
-                    ? 'bg-white text-[#1d1d1f] shadow-xs'
-                    : 'text-[#515154] hover:text-[#1d1d1f]'
-                }`}
-              >
-                <span>BSIT 2-B</span>
-                <span className="text-[11px] text-[#6e6e73] tabular-nums">({countSectionB})</span>
-              </button>
-
-              <button
-                onClick={() => setActiveTab('ALL')}
-                className={`px-3 py-1.5 text-xs font-medium rounded-lg liquid-transition flex items-center space-x-1.5 ${
-                  activeTab === 'ALL'
-                    ? 'bg-white text-[#1d1d1f] shadow-xs'
-                    : 'text-[#515154] hover:text-[#1d1d1f]'
-                }`}
-              >
-                <span>All</span>
-                <span className="text-[11px] text-[#6e6e73] tabular-nums">
-                  ({countSectionA + countSectionB})
-                </span>
-              </button>
-            </div>
+            {/* Gliding Section Tabs */}
+            <LiquidSegmentedControl
+              ariaLabel="Section filter"
+              size="sm"
+              className="w-fit"
+              value={activeTab}
+              onChange={setActiveTab}
+              options={[
+                {
+                  value: 'BSIT 2-A',
+                  label: (
+                    <span className="flex items-center space-x-1.5">
+                      <span>BSIT 2-A</span>
+                      <span className="text-[11px] text-[#6e6e73] tabular-nums">
+                        ({countSectionA})
+                      </span>
+                    </span>
+                  )
+                },
+                {
+                  value: 'BSIT 2-B',
+                  label: (
+                    <span className="flex items-center space-x-1.5">
+                      <span>BSIT 2-B</span>
+                      <span className="text-[11px] text-[#6e6e73] tabular-nums">
+                        ({countSectionB})
+                      </span>
+                    </span>
+                  )
+                },
+                {
+                  value: 'ALL',
+                  label: (
+                    <span className="flex items-center space-x-1.5">
+                      <span>All</span>
+                      <span className="text-[11px] text-[#6e6e73] tabular-nums">
+                        ({countSectionA + countSectionB})
+                      </span>
+                    </span>
+                  )
+                }
+              ]}
+            />
 
             {/* Search & Sort */}
             <div className="flex items-center gap-2">
@@ -314,19 +322,20 @@ export default function ViewScore() {
                             </span>
                           </td>
                           <td className="py-3.5 px-4 text-right text-[#6e6e73]">
-                            {isExpanded ? (
-                              <ChevronUp className="w-4 h-4" />
-                            ) : (
-                              <ChevronDown className="w-4 h-4" />
-                            )}
+                            <ChevronDown
+                              className={`w-4 h-4 inline-block transition-transform duration-200 ease-[var(--ease-liquid)] ${
+                                isExpanded ? 'rotate-180' : ''
+                              }`}
+                            />
                           </td>
                         </tr>
 
                         {isExpanded && (
-                          <tr className="bg-white/50 animate-liquid-enter">
+                          <tr className="bg-white/55 animate-liquid-settle">
                             <td colSpan={activeTab === 'ALL' ? 8 : 7} className="px-5 py-3.5">
                               <div className="text-xs text-[#515154] space-y-1.5">
-                                {(details.examType === 'MIDTERM' || details.examType === 'PREFINAL') &&
+                                {(details.examType === 'MIDTERM' ||
+                                  details.examType === 'PREFINAL') &&
                                   details.part1Mcq !== null && (
                                     <div className="text-[#515154] font-medium tabular-nums">
                                       Part I MCQ: {details.part1Mcq}/30 ·{' '}

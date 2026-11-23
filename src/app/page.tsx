@@ -14,6 +14,8 @@ import {
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
 import { ExamType, getExamType } from '@/lib/examUtils'
+import { SkyCloudBackdrop } from '@/components/SkyCloudBackdrop'
+import { LiquidSegmentedControl, handleSpecularMove } from '@/components/LiquidSegmentedControl'
 
 interface StudentExamRecord {
   id: string
@@ -29,8 +31,14 @@ export default function Onboarding() {
 
   // Step 1: Student Type & Section | Step 2: Name & School Email OTP | Step 3: Exam Card Selection
   const [step, setStep] = useState<1 | 2 | 3>(1)
+  const [stepDir, setStepDir] = useState<1 | -1>(1)
   const [studentMode, setStudentMode] = useState<'existing' | 'new'>('existing')
   const [section, setSection] = useState('BSIT 2-A')
+
+  const goToStep = (next: 1 | 2 | 3) => {
+    setStepDir(next >= step ? 1 : -1)
+    setStep(next)
+  }
 
   // Step 2 state
   const [selectedExistingName, setSelectedExistingName] = useState('')
@@ -262,7 +270,7 @@ export default function Onboarding() {
 
       if (serverRes.ok) {
         setIsEmailVerified(true)
-        setStep(3)
+        goToStep(3)
         setVerifyingOtp(false)
         return
       }
@@ -319,11 +327,13 @@ export default function Onboarding() {
   }
 
   return (
-    <main className="min-h-screen flex flex-col items-center justify-center p-4 sm:p-6 relative">
+    <main className="min-h-screen flex flex-col items-center justify-center p-4 sm:p-6 relative overflow-x-hidden">
+      <SkyCloudBackdrop />
+
       {/* Fixed Floating Glass Scoreboard Pill */}
       <Link
         href="/view-score"
-        className="fixed top-5 right-5 z-50 liquid-glass-bar flex items-center space-x-2 text-xs sm:text-sm font-medium text-[#515154] hover:text-[#1d1d1f] px-4 py-2 rounded-full liquid-transition active:scale-[0.98]"
+        className="fixed top-5 right-5 z-50 liquid-glass-bar flex items-center space-x-2 text-xs sm:text-sm font-medium text-[#515154] hover:text-[#1d1d1f] px-4 py-2 rounded-full liquid-press"
       >
         <Search className="w-3.5 h-3.5" />
         <span>Check Score</span>
@@ -331,9 +341,9 @@ export default function Onboarding() {
 
       {/* Compact Liquid Glass Wizard Card */}
       <div
-        className={`w-full ${
+        className={`relative z-10 w-full ${
           step === 3 ? 'max-w-xl' : 'max-w-md'
-        } liquid-glass rounded-3xl p-6 sm:p-8 flex flex-col justify-between transition-[max-width] duration-300 ease-[cubic-bezier(0.22,1,0.36,1)]`}
+        } liquid-glass rounded-3xl p-6 sm:p-8 flex flex-col justify-between transition-[max-width] duration-300 ease-[var(--ease-liquid)]`}
       >
         {/* Card Header */}
         <div className="flex flex-col items-center text-center space-y-1.5 mb-6">
@@ -352,20 +362,26 @@ export default function Onboarding() {
 
         {/* STEP 1: STUDENT TYPE & SECTION */}
         {step === 1 && (
-          <div key="step-1" className="flex flex-col space-y-4 animate-liquid-enter">
+          <div
+            key="step-1"
+            className={`flex flex-col space-y-4 ${
+              stepDir < 0 ? 'animate-liquid-back' : 'animate-liquid-settle'
+            }`}
+          >
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-[#515154]">Student Status</label>
               <div className="grid grid-cols-2 gap-2.5">
                 <button
                   type="button"
+                  onPointerMove={handleSpecularMove}
                   onClick={() => {
                     setStudentMode('existing')
                     setErrorMsg('')
                   }}
-                  className={`p-3.5 rounded-2xl border text-left liquid-transition active:scale-[0.985] ${
+                  className={`p-3.5 rounded-2xl border text-left liquid-specular liquid-press ${
                     studentMode === 'existing'
                       ? 'border-[#1d1d1f] bg-[#1d1d1f] text-white shadow-sm'
-                      : 'border-black/[0.08] bg-white/75 text-[#1d1d1f] hover:bg-white hover:border-black/20'
+                      : 'liquid-glass-tile text-[#1d1d1f]'
                   }`}
                 >
                   <div className="text-sm font-semibold">Existing Student</div>
@@ -380,14 +396,15 @@ export default function Onboarding() {
 
                 <button
                   type="button"
+                  onPointerMove={handleSpecularMove}
                   onClick={() => {
                     setStudentMode('new')
                     setErrorMsg('')
                   }}
-                  className={`p-3.5 rounded-2xl border text-left liquid-transition active:scale-[0.985] ${
+                  className={`p-3.5 rounded-2xl border text-left liquid-specular liquid-press ${
                     studentMode === 'new'
                       ? 'border-[#1d1d1f] bg-[#1d1d1f] text-white shadow-sm'
-                      : 'border-black/[0.08] bg-white/75 text-[#1d1d1f] hover:bg-white hover:border-black/20'
+                      : 'liquid-glass-tile text-[#1d1d1f]'
                   }`}
                 >
                   <div className="text-sm font-semibold">New Student</div>
@@ -404,34 +421,29 @@ export default function Onboarding() {
 
             <div className="space-y-1.5">
               <label className="text-xs font-medium text-[#515154]">Section</label>
-              <div className="grid grid-cols-2 gap-2.5 bg-black/[0.04] p-1 rounded-2xl border border-black/[0.05]">
-                {['BSIT 2-A', 'BSIT 2-B'].map((sec) => (
-                  <button
-                    key={sec}
-                    type="button"
-                    onClick={() => {
-                      setSection(sec)
-                      setSelectedExistingName('')
-                    }}
-                    className={`py-2 px-3 rounded-xl text-xs font-semibold liquid-transition ${
-                      section === sec
-                        ? 'bg-white text-[#1d1d1f] shadow-xs'
-                        : 'text-[#515154] hover:text-[#1d1d1f]'
-                    }`}
-                  >
-                    {sec}
-                  </button>
-                ))}
-              </div>
+              <LiquidSegmentedControl
+                fullWidth
+                size="md"
+                ariaLabel="Section"
+                value={section}
+                onChange={(sec) => {
+                  setSection(sec)
+                  setSelectedExistingName('')
+                }}
+                options={[
+                  { value: 'BSIT 2-A', label: 'BSIT 2-A' },
+                  { value: 'BSIT 2-B', label: 'BSIT 2-B' }
+                ]}
+              />
             </div>
 
             <button
               type="button"
               onClick={() => {
                 setErrorMsg('')
-                setStep(2)
+                goToStep(2)
               }}
-              className="mt-1 w-full flex items-center justify-center space-x-1.5 py-2.5 px-4 bg-[#0071e3] text-white rounded-xl text-sm font-medium hover:bg-[#0077ed] active:scale-[0.985] liquid-transition shadow-xs"
+              className="mt-1 w-full flex items-center justify-center space-x-1.5 py-2.5 px-4 bg-[#0071e3] text-white rounded-xl text-sm font-medium hover:bg-[#0077ed] liquid-press shadow-xs"
             >
               <span>Continue</span>
               <ChevronRight className="w-4 h-4" />
@@ -441,7 +453,12 @@ export default function Onboarding() {
 
         {/* STEP 2: NAME & SCHOOL EMAIL OTP */}
         {step === 2 && (
-          <div key="step-2" className="flex flex-col space-y-4 animate-liquid-enter">
+          <div
+            key="step-2"
+            className={`flex flex-col space-y-4 ${
+              stepDir > 0 ? 'animate-liquid-forward' : 'animate-liquid-back'
+            }`}
+          >
             {studentMode === 'existing' ? (
               <div className="space-y-1.5">
                 <div className="flex items-center justify-between">
@@ -552,18 +569,20 @@ export default function Onboarding() {
                 </button>
               )}
 
-              {(otpSent || showManualOtp) && (
-                <div className="pt-1 animate-liquid-enter">
-                  <input
-                    type="text"
-                    maxLength={6}
-                    value={otpCode}
-                    onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
-                    placeholder="Enter 6-digit code"
-                    className="w-full px-3 py-2 border border-black/[0.12] bg-white/90 rounded-xl text-xs font-mono tracking-widest text-center focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0071e3]/35 focus:border-[#0071e3] liquid-transition"
-                  />
+              <div className="liquid-disclosure" data-open={otpSent || showManualOtp}>
+                <div>
+                  <div className="pt-1">
+                    <input
+                      type="text"
+                      maxLength={6}
+                      value={otpCode}
+                      onChange={(e) => setOtpCode(e.target.value.replace(/\D/g, ''))}
+                      placeholder="Enter 6-digit code"
+                      className="w-full px-3 py-2 border border-black/[0.12] bg-white/90 rounded-xl text-xs font-mono tracking-widest text-center focus:bg-white focus:outline-none focus:ring-2 focus:ring-[#0071e3]/35 focus:border-[#0071e3] liquid-transition"
+                    />
+                  </div>
                 </div>
-              )}
+              </div>
             </div>
 
             <div className="flex items-center gap-2 pt-1">
@@ -571,9 +590,9 @@ export default function Onboarding() {
                 type="button"
                 onClick={() => {
                   setErrorMsg('')
-                  setStep(1)
+                  goToStep(1)
                 }}
-                className="px-3.5 py-2.5 border border-black/[0.08] bg-white/75 rounded-xl text-xs font-medium text-[#515154] hover:bg-white hover:text-[#1d1d1f] flex items-center space-x-1 liquid-transition"
+                className="px-3.5 py-2.5 border border-black/[0.08] bg-white/75 rounded-xl text-xs font-medium text-[#515154] hover:bg-white hover:text-[#1d1d1f] flex items-center space-x-1 liquid-press"
               >
                 <ChevronLeft className="w-3.5 h-3.5" />
                 <span>Back</span>
@@ -583,7 +602,7 @@ export default function Onboarding() {
                 type="button"
                 onClick={handleVerifyOtpAndContinue}
                 disabled={otpCode.length < 6 || verifyingOtp}
-                className="flex-1 flex items-center justify-center space-x-1.5 py-2.5 px-4 bg-[#0071e3] text-white rounded-xl text-xs font-semibold hover:bg-[#0077ed] active:scale-[0.985] disabled:bg-black/10 disabled:text-[#6e6e73] liquid-transition shadow-xs"
+                className="flex-1 flex items-center justify-center space-x-1.5 py-2.5 px-4 bg-[#0071e3] text-white rounded-xl text-xs font-semibold hover:bg-[#0077ed] disabled:bg-black/10 disabled:text-[#6e6e73] liquid-press shadow-xs"
               >
                 <span>{verifyingOtp ? 'Verifying...' : 'Verify & Continue'}</span>
                 <ChevronRight className="w-3.5 h-3.5" />
@@ -594,7 +613,7 @@ export default function Onboarding() {
 
         {/* STEP 3: EXAM SELECTION CARDS (PRELIM, MIDTERM LOCKED; PREFINAL ACTIVE) */}
         {step === 3 && (
-          <div key="step-3" className="flex flex-col space-y-4 animate-liquid-enter">
+          <div key="step-3" className="flex flex-col space-y-4 animate-liquid-forward">
             <div className="px-3.5 py-2.5 bg-white/65 border border-black/[0.07] rounded-xl flex items-center justify-between text-xs">
               <span className="font-semibold text-[#1d1d1f] truncate">{activeStudentName}</span>
               <span className="text-[#515154] shrink-0 ml-2">{section}</span>
@@ -649,13 +668,14 @@ export default function Onboarding() {
               <button
                 type="button"
                 disabled={studentStatus.hasPrefinal}
+                onPointerMove={handleSpecularMove}
                 onClick={() => setSelectedExamType('PREFINAL')}
-                className={`p-4 rounded-2xl border text-left liquid-transition active:scale-[0.985] flex flex-col justify-between ${
+                className={`p-4 rounded-2xl border text-left liquid-specular liquid-press flex flex-col justify-between ${
                   studentStatus.hasPrefinal
                     ? 'border-black/[0.06] bg-white/40 text-[#6e6e73] cursor-not-allowed'
                     : selectedExamType === 'PREFINAL'
-                    ? 'border-[#0071e3] bg-[#0071e3] text-white shadow-[0_10px_24px_-8px_rgba(0,113,227,0.45)]'
-                    : 'border-black/[0.1] bg-white/85 text-[#1d1d1f] hover:bg-white hover:border-black/20'
+                    ? 'border-[#0071e3] bg-[#0071e3] text-white shadow-[0_12px_28px_-10px_rgba(15,23,42,0.24)]'
+                    : 'liquid-glass-tile text-[#1d1d1f]'
                 }`}
               >
                 <div className="space-y-1">
@@ -682,9 +702,9 @@ export default function Onboarding() {
                 type="button"
                 onClick={() => {
                   setErrorMsg('')
-                  setStep(2)
+                  goToStep(2)
                 }}
-                className="px-3.5 py-2.5 border border-black/[0.08] bg-white/75 rounded-xl text-xs font-medium text-[#515154] hover:bg-white hover:text-[#1d1d1f] flex items-center space-x-1 liquid-transition"
+                className="px-3.5 py-2.5 border border-black/[0.08] bg-white/75 rounded-xl text-xs font-medium text-[#515154] hover:bg-white hover:text-[#1d1d1f] flex items-center space-x-1 liquid-press"
               >
                 <ChevronLeft className="w-3.5 h-3.5" />
                 <span>Back</span>
@@ -694,7 +714,7 @@ export default function Onboarding() {
                 type="button"
                 onClick={handleStartExam}
                 disabled={selectedExamType !== 'PREFINAL' || studentStatus.hasPrefinal}
-                className="flex-1 flex items-center justify-center space-x-1.5 py-2.5 px-4 bg-[#1d1d1f] text-white rounded-xl text-xs font-semibold hover:bg-black/85 active:scale-[0.985] disabled:bg-black/10 disabled:text-[#6e6e73] liquid-transition shadow-xs"
+                className="flex-1 flex items-center justify-center space-x-1.5 py-2.5 px-4 bg-[#1d1d1f] text-white rounded-xl text-xs font-semibold hover:bg-black/85 disabled:bg-black/10 disabled:text-[#6e6e73] liquid-press shadow-xs"
               >
                 <span>Start Pre-Final Exam</span>
                 <ChevronRight className="w-3.5 h-3.5" />
@@ -703,12 +723,16 @@ export default function Onboarding() {
           </div>
         )}
 
-        {/* Error Feedback */}
-        {errorMsg && (
-          <p className="text-red-700 text-xs font-medium text-center mt-3 bg-red-500/10 border border-red-500/20 rounded-xl py-2 px-3">
-            {errorMsg}
-          </p>
-        )}
+        {/* Smooth Error Disclosure */}
+        <div className="liquid-disclosure" data-open={Boolean(errorMsg)}>
+          <div>
+            {errorMsg && (
+              <p className="text-red-700 text-xs font-medium text-center mt-3 bg-red-500/10 border border-red-500/20 rounded-xl py-2 px-3">
+                {errorMsg}
+              </p>
+            )}
+          </div>
+        </div>
 
         {/* Step Dot Indicators */}
         <div className="pt-5 mt-6 border-t border-black/[0.06] flex items-center justify-between">
@@ -716,7 +740,7 @@ export default function Onboarding() {
             {[1, 2, 3].map((dot) => (
               <span
                 key={dot}
-                className={`h-1.5 rounded-full transition-all duration-300 ease-[cubic-bezier(0.22,1,0.36,1)] ${
+                className={`h-1.5 rounded-full transition-all duration-300 ease-[var(--ease-liquid)] ${
                   step === dot ? 'w-6 bg-[#1d1d1f]' : 'w-1.5 bg-black/15'
                 }`}
               />

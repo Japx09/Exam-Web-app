@@ -86,14 +86,20 @@ export default function EssayPage() {
 
   return (
     <main className="flex-1 flex flex-col items-center justify-center p-4 sm:p-6 relative">
-      {showToast && (
-        <div className="fixed top-6 left-1/2 -translate-x-1/2 bg-red-600/95 backdrop-blur-md text-white px-5 py-2.5 rounded-full shadow-lg flex items-center space-x-2 animate-liquid-enter z-50">
-          <AlertCircle className="w-4 h-4" />
-          <span className="font-medium text-xs sm:text-sm">
-            Copy-paste detected. Essay marked 0.
-          </span>
-        </div>
-      )}
+      <div
+        role="status"
+        aria-live="polite"
+        className={`fixed top-6 left-1/2 -translate-x-1/2 bg-red-600/95 backdrop-blur-md text-white px-5 py-2.5 rounded-full shadow-lg flex items-center space-x-2 z-50 liquid-transition ${
+          showToast
+            ? 'opacity-100 translate-y-0 scale-100'
+            : 'opacity-0 -translate-y-2.5 scale-95 pointer-events-none'
+        }`}
+      >
+        <AlertCircle className="w-4 h-4" />
+        <span className="font-medium text-xs sm:text-sm">
+          Copy-paste detected. Essay marked 0.
+        </span>
+      </div>
 
       <div className="w-full max-w-3xl flex flex-col space-y-3.5 my-6">
         <header className="liquid-glass-bar rounded-2xl px-4 sm:px-5 py-3 flex items-center justify-between gap-2 text-xs">
@@ -157,7 +163,7 @@ export default function EssayPage() {
               </p>
 
               {/* Essay 1 */}
-              <div className="space-y-3 border border-black/[0.08] rounded-2xl p-4 sm:p-5 bg-white/60">
+              <div className="space-y-3 rounded-2xl p-4 sm:p-5 liquid-glass-tile">
                 <div className="flex items-center justify-between gap-2">
                   <h3 className="text-base font-semibold text-[#1d1d1f]">{activeEssays[0].title}</h3>
                   <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-[#1d1d1f] text-white shrink-0">
@@ -171,7 +177,7 @@ export default function EssayPage() {
                   <span className="text-xs font-semibold text-[#1d1d1f]">
                     {examType === 'PREFINAL' ? 'Answer both parts' : 'Required 4-step pitch structure'}
                   </span>
-                  <ul className="text-xs text-[#515154] space-y-1 leading-relaxed">
+                  <ul className="text-xs text-[#515154] space-y-1 leading-relaxed max-w-[68ch]">
                     {activeEssays[0].instructions.map((inst: string, idx: number) => (
                       <li key={idx}>{inst}</li>
                     ))}
@@ -195,7 +201,7 @@ export default function EssayPage() {
               </div>
 
               {/* Essay 2 */}
-              <div className="space-y-3 border border-black/[0.08] rounded-2xl p-4 sm:p-5 bg-white/60">
+              <div className="space-y-3 rounded-2xl p-4 sm:p-5 liquid-glass-tile">
                 <div className="flex items-center justify-between gap-2">
                   <h3 className="text-base font-semibold text-[#1d1d1f]">{activeEssays[1].title}</h3>
                   <span className="text-xs font-semibold px-2.5 py-0.5 rounded-full bg-[#1d1d1f] text-white shrink-0">
@@ -207,7 +213,7 @@ export default function EssayPage() {
                 </p>
                 <div className="bg-white/90 border border-black/[0.07] rounded-xl p-3.5 space-y-1.5">
                   <span className="text-xs font-semibold text-[#1d1d1f]">Answer both parts</span>
-                  <ul className="text-xs text-[#515154] space-y-1 leading-relaxed">
+                  <ul className="text-xs text-[#515154] space-y-1 leading-relaxed max-w-[68ch]">
                     {activeEssays[1].instructions.map((inst: string, idx: number) => (
                       <li key={idx}>{inst}</li>
                     ))}

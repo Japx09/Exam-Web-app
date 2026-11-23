@@ -6,6 +6,7 @@ import { questions as prelimQuestions } from '@/data/questions'
 import { midtermMCQs } from '@/data/midtermQuestions'
 import { prefinalMCQs } from '@/data/prefinalQuestions'
 import { ActiveQuestion, ExamType, shuffleArray } from '@/lib/examUtils'
+import { handleSpecularMove } from '@/components/LiquidSegmentedControl'
 import { useAntiCheat } from '@/hooks/useAntiCheat'
 import { AlertCircle, Clock, ChevronRight } from 'lucide-react'
 
@@ -138,10 +139,10 @@ export default function ExamPage() {
             </div>
 
             <div
-              className={`flex items-center space-x-1.5 text-sm font-semibold font-mono tabular-nums px-2.5 py-1 rounded-xl ${
+              className={`flex items-center space-x-1.5 text-sm font-semibold font-mono tabular-nums px-2.5 py-1 rounded-xl border liquid-transition ${
                 timeLeft <= 10
-                  ? 'bg-red-500/12 text-red-700 animate-pulse'
-                  : 'bg-black/[0.05] text-[#1d1d1f]'
+                  ? 'bg-red-500/12 border-red-500/25 text-red-700'
+                  : 'bg-black/[0.05] border-transparent text-[#1d1d1f]'
               }`}
             >
               <Clock className="w-3.5 h-3.5" />
@@ -149,16 +150,16 @@ export default function ExamPage() {
             </div>
           </div>
 
-          {/* Fluid Progress Bar */}
-          <div className="w-full h-1.5 bg-black/[0.06] rounded-full overflow-hidden">
+          {/* GPU-Composited Liquid Glass Capsule Progress Bar */}
+          <div className="w-full h-2 bg-black/[0.06] rounded-full p-0.5 overflow-hidden">
             <div
-              className="h-full bg-[#0071e3] rounded-full transition-[width] duration-500 ease-[cubic-bezier(0.22,1,0.36,1)]"
-              style={{ width: `${((currentIndex + 1) / shuffledQuestions.length) * 100}%` }}
+              className="w-full h-full origin-left bg-[#0071e3] rounded-full shadow-[inset_0_1px_0_rgba(255,255,255,0.45)] transition-transform duration-300 ease-[var(--ease-liquid)]"
+              style={{ transform: `scaleX(${(currentIndex + 1) / shuffledQuestions.length})` }}
             />
           </div>
 
-          {/* Animated Question Stage */}
-          <div key={currentQ.id} className="space-y-5 animate-liquid-enter">
+          {/* Directional Liquid Question Stage */}
+          <div key={currentQ.id} className="space-y-5 animate-liquid-forward">
             <h2 className="text-lg sm:text-[19px] font-medium text-[#1d1d1f] leading-relaxed max-w-[65ch]">
               {currentQ.question}
             </h2>
@@ -170,11 +171,12 @@ export default function ExamPage() {
                   <button
                     key={opt}
                     type="button"
+                    onPointerMove={handleSpecularMove}
                     onClick={() => setSelectedOption(opt)}
-                    className={`flex items-center text-left px-4 py-3.5 rounded-2xl border text-sm liquid-transition active:scale-[0.99] ${
+                    className={`flex items-center text-left px-4 py-3.5 rounded-2xl border text-sm liquid-specular liquid-press ${
                       isSelected
-                        ? 'border-[#0071e3] bg-[#0071e3]/[0.07] text-[#1d1d1f] shadow-[0_6px_20px_-8px_rgba(0,113,227,0.35)]'
-                        : 'border-black/[0.08] bg-white/80 text-[#1d1d1f] hover:bg-white hover:border-black/20'
+                        ? 'border-[#0071e3] bg-[#0071e3]/[0.08] backdrop-blur-xl text-[#1d1d1f] shadow-[0_10px_24px_-12px_rgba(15,23,42,0.18),inset_0_1px_0_rgba(255,255,255,0.92)]'
+                        : 'liquid-glass-tile text-[#1d1d1f] hover:-translate-y-[1px]'
                     }`}
                   >
                     <span
