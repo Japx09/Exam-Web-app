@@ -315,7 +315,7 @@ export function PrefinalDesignAuditStudio({
 
   return (
     <main className="flex-1 flex flex-col items-center px-4 sm:px-6 py-5 sm:py-7">
-      <div className="w-full max-w-5xl flex flex-col space-y-4">
+      <div className="w-full max-w-6xl flex flex-col space-y-4">
         {/* Top Floating Glass Bar */}
         <header className="liquid-glass-bar rounded-2xl px-4 sm:px-5 py-3 flex flex-wrap items-center justify-between gap-3">
           <div className="flex items-center space-x-2.5 text-xs">
@@ -365,8 +365,8 @@ export function PrefinalDesignAuditStudio({
                   Classify Good UX vs AI Slop UI
                 </h1>
                 <p className="text-xs sm:text-sm text-[#515154] leading-relaxed">
-                  Inspect each UI specimen below. Drag any card smoothly into a bucket or tap a
-                  label to classify Good UX Craft versus AI Slop UI.
+                  Inspect each UI card on the left and drag it smoothly to the matching bucket on the
+                  right, or tap a label to classify Good UX Craft versus AI Slop UI.
                 </p>
               </div>
 
@@ -380,134 +380,72 @@ export function PrefinalDesignAuditStudio({
               </button>
             </div>
 
-            {/* Unassigned Specimens Deck */}
-            <div
-              data-audit-bucket="QUEUE"
-              className={`rounded-2xl p-4 border liquid-transition space-y-3 ${
-                hoveredBucket === 'QUEUE'
-                  ? 'bg-white/85 border-black/25 shadow-[inset_0_2px_10px_rgba(15,23,42,0.06)]'
-                  : 'bg-white/45 border-black/[0.07]'
-              }`}
-            >
-              <div className="flex items-center justify-between text-xs">
-                <span className="font-semibold text-[#1d1d1f]">UI Specimens to Classify</span>
-                <span className="text-[#515154] tabular-nums">
-                  {unassignedSpecimens.length} remaining
-                </span>
-              </div>
-
-              {unassignedSpecimens.length === 0 ? (
-                <div className="py-5 text-center text-xs text-[#515154]">
-                  All 5 UI specimens classified. Drag cards between buckets to revise or continue to
-                  Design Principles.
+            {/* Side-by-Side Split Studio: Left Specimens -> Right Drop Buckets */}
+            <div className="grid grid-cols-1 md:grid-cols-12 gap-5 items-start">
+              {/* LEFT: Unassigned Specimens Deck */}
+              <div
+                data-audit-bucket="QUEUE"
+                className={`md:col-span-6 rounded-2xl p-4 border liquid-transition space-y-3 ${
+                  hoveredBucket === 'QUEUE'
+                    ? 'bg-white/85 border-black/25 shadow-[inset_0_2px_10px_rgba(15,23,42,0.06)]'
+                    : 'bg-white/45 border-black/[0.07]'
+                }`}
+              >
+                <div className="flex items-center justify-between text-xs">
+                  <span className="font-semibold text-[#1d1d1f]">UI Specimens (Drag Left → Right)</span>
+                  <span className="text-[#515154] tabular-nums">
+                    {unassignedSpecimens.length} remaining
+                  </span>
                 </div>
-              ) : (
-                <div className="grid grid-cols-1 md:grid-cols-2 gap-3.5">
-                  {unassignedSpecimens.map((spec) => {
-                    const isPicked = activeDragId === spec.id
-                    return (
-                      <div
-                        key={spec.id}
-                        ref={registerCardRef(spec.id)}
-                        onPointerDown={(e) => startDrag(e, spec.id)}
-                        onPointerMove={handleSpecularMove}
-                        className={`rounded-2xl p-3.5 touch-none liquid-press flex flex-col justify-between space-y-3 ${
-                          isPicked
-                            ? 'opacity-30 scale-[0.98] border border-dashed border-black/25 bg-white/40'
-                            : 'liquid-glass-tile liquid-specular hover:-translate-y-[1px] cursor-grab active:cursor-grabbing'
-                        }`}
-                      >
-                        <div className="space-y-2.5">
-                          <div className="flex items-center justify-between gap-2">
-                            <div>
-                              <h2 className="text-xs font-semibold text-[#1d1d1f]">{spec.title}</h2>
-                              <p className="text-[11px] text-[#515154]">{spec.context}</p>
+
+                {unassignedSpecimens.length === 0 ? (
+                  <div className="py-10 text-center text-xs text-[#515154]">
+                    All 5 UI specimens classified. Drag cards between buckets on the right to
+                    revise or continue to Design Principles.
+                  </div>
+                ) : (
+                  <div className="grid grid-cols-1 gap-3.5">
+                    {unassignedSpecimens.map((spec) => {
+                      const isPicked = activeDragId === spec.id
+                      return (
+                        <div
+                          key={spec.id}
+                          ref={registerCardRef(spec.id)}
+                          onPointerDown={(e) => startDrag(e, spec.id)}
+                          onPointerMove={handleSpecularMove}
+                          className={`rounded-2xl p-3.5 touch-none liquid-press flex flex-col justify-between space-y-3 ${
+                            isPicked
+                              ? 'opacity-30 scale-[0.98] border border-dashed border-black/25 bg-white/40'
+                              : 'liquid-glass-tile liquid-specular hover:-translate-y-[1px] cursor-grab active:cursor-grabbing'
+                          }`}
+                        >
+                          <div className="space-y-2.5">
+                            <div className="flex items-center justify-between gap-2">
+                              <div>
+                                <h2 className="text-xs font-semibold text-[#1d1d1f]">{spec.title}</h2>
+                                <p className="text-[11px] text-[#515154]">{spec.context}</p>
+                              </div>
+                              <GripVertical className="w-4 h-4 text-[#6e6e73] shrink-0" />
                             </div>
-                            <GripVertical className="w-4 h-4 text-[#6e6e73] shrink-0" />
+                            <AuditSpecimenVisual visualKey={spec.visualKey} />
                           </div>
-                          <AuditSpecimenVisual visualKey={spec.visualKey} />
-                        </div>
 
-                        <div className="grid grid-cols-2 gap-2 pt-1">
-                          <button
-                            type="button"
-                            onClick={() => assignCategory(spec.id, 'GOOD_UX')}
-                            className="py-1.5 px-2.5 rounded-xl text-xs font-medium border border-[#0071e3]/30 bg-[#0071e3]/[0.07] text-[#0071e3] hover:bg-[#0071e3] hover:text-white liquid-press"
-                          >
-                            Good UX
-                          </button>
-                          <button
-                            type="button"
-                            onClick={() => assignCategory(spec.id, 'AI_SLOP')}
-                            className="py-1.5 px-2.5 rounded-xl text-xs font-medium border border-black/[0.12] bg-black/[0.045] text-[#1d1d1f] hover:bg-[#1d1d1f] hover:text-white liquid-press"
-                          >
-                            AI Slop UI
-                          </button>
-                        </div>
-                      </div>
-                    )
-                  })}
-                </div>
-              )}
-            </div>
-
-            {/* Two Refractive Glass Drop Wells: Good UX vs AI Slop UI */}
-            <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-              {/* Good UX Bucket */}
-              <div
-                data-audit-bucket="GOOD_UX"
-                className={`rounded-2xl p-4 border-2 min-h-[200px] backdrop-blur-xl liquid-transition flex flex-col space-y-3 ${
-                  hoveredBucket === 'GOOD_UX'
-                    ? 'border-[#0071e3] bg-white/85 shadow-[inset_0_2px_14px_rgba(0,113,227,0.1)]'
-                    : 'border-dashed border-[#0071e3]/35 bg-white/55'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-sm font-semibold text-[#1d1d1f]">Good UX / Craft</h2>
-                    <p className="text-[11px] text-[#515154]">
-                      Clear hierarchy, accessibility, honest copy, recovery
-                    </p>
-                  </div>
-                  <span className="text-xs font-semibold text-[#0071e3] bg-[#0071e3]/10 px-2.5 py-0.5 rounded-full tabular-nums">
-                    {goodUxSpecimens.length}
-                  </span>
-                </div>
-
-                {goodUxSpecimens.length === 0 ? (
-                  <div className="flex-1 flex items-center justify-center text-xs text-[#6e6e73] py-8">
-                    {hoveredBucket === 'GOOD_UX'
-                      ? 'Release to place in Good UX'
-                      : 'Drop Good UX specimens here'}
-                  </div>
-                ) : (
-                  <div className="space-y-2.5">
-                    {goodUxSpecimens.map((spec) => {
-                      const isPicked = activeDragId === spec.id
-                      return (
-                        <div
-                          key={spec.id}
-                          ref={registerCardRef(spec.id)}
-                          onPointerDown={(e) => startDrag(e, spec.id)}
-                          onPointerMove={handleSpecularMove}
-                          className={`rounded-2xl p-3 bg-white/92 border border-[#0071e3]/25 shadow-2xs space-y-2 cursor-grab active:cursor-grabbing touch-none liquid-specular liquid-transition ${
-                            isPicked ? 'opacity-30 scale-[0.98]' : ''
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-semibold text-[#1d1d1f]">
-                              {spec.title}
-                            </span>
+                          <div className="grid grid-cols-2 gap-2 pt-1">
                             <button
                               type="button"
-                              onClick={() => assignCategory(spec.id, null)}
-                              className="w-5 h-5 rounded-full bg-black/[0.05] hover:bg-black/10 text-[#515154] flex items-center justify-center liquid-press"
-                              aria-label={`Remove ${spec.title}`}
+                              onClick={() => assignCategory(spec.id, 'GOOD_UX')}
+                              className="py-1.5 px-2.5 rounded-xl text-xs font-medium border border-[#0071e3]/30 bg-[#0071e3]/[0.07] text-[#0071e3] hover:bg-[#0071e3] hover:text-white liquid-press"
                             >
-                              <X className="w-3 h-3" />
+                              Good UX
+                            </button>
+                            <button
+                              type="button"
+                              onClick={() => assignCategory(spec.id, 'AI_SLOP')}
+                              className="py-1.5 px-2.5 rounded-xl text-xs font-medium border border-black/[0.12] bg-black/[0.045] text-[#1d1d1f] hover:bg-[#1d1d1f] hover:text-white liquid-press"
+                            >
+                              AI Slop UI
                             </button>
                           </div>
-                          <AuditSpecimenVisual visualKey={spec.visualKey} />
                         </div>
                       )
                     })}
@@ -515,66 +453,131 @@ export function PrefinalDesignAuditStudio({
                 )}
               </div>
 
-              {/* AI Slop Bucket */}
-              <div
-                data-audit-bucket="AI_SLOP"
-                className={`rounded-2xl p-4 border-2 min-h-[200px] backdrop-blur-xl liquid-transition flex flex-col space-y-3 ${
-                  hoveredBucket === 'AI_SLOP'
-                    ? 'border-[#1d1d1f] bg-white/85 shadow-[inset_0_2px_14px_rgba(15,23,42,0.08)]'
-                    : 'border-dashed border-black/20 bg-white/55'
-                }`}
-              >
-                <div className="flex items-center justify-between">
-                  <div>
-                    <h2 className="text-sm font-semibold text-[#1d1d1f]">AI Slop UI</h2>
-                    <p className="text-[11px] text-[#515154]">
-                      Gratuitous glows/gradients, hype copy, vague or hidden UX
-                    </p>
+              {/* RIGHT: Sticky Drop Buckets (Good UX vs AI Slop UI) */}
+              <div className="md:col-span-6 md:sticky md:top-5 md:max-h-[calc(100vh-2.5rem)] md:overflow-y-auto space-y-4">
+                {/* Good UX Bucket */}
+                <div
+                  data-audit-bucket="GOOD_UX"
+                  className={`rounded-2xl p-4 border-2 min-h-[175px] backdrop-blur-xl liquid-transition flex flex-col space-y-3 ${
+                    hoveredBucket === 'GOOD_UX'
+                      ? 'border-[#0071e3] bg-white/85 shadow-[inset_0_2px_14px_rgba(0,113,227,0.1)]'
+                      : 'border-dashed border-[#0071e3]/35 bg-white/55'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h2 className="text-sm font-semibold text-[#1d1d1f]">Good UX / Craft</h2>
+                      <p className="text-[11px] text-[#515154]">
+                        Clear hierarchy, accessibility, honest copy, recovery
+                      </p>
+                    </div>
+                    <span className="text-xs font-semibold text-[#0071e3] bg-[#0071e3]/10 px-2.5 py-0.5 rounded-full tabular-nums">
+                      {goodUxSpecimens.length}
+                    </span>
                   </div>
-                  <span className="text-xs font-semibold text-[#1d1d1f] bg-black/[0.07] px-2.5 py-0.5 rounded-full tabular-nums">
-                    {aiSlopSpecimens.length}
-                  </span>
+
+                  {goodUxSpecimens.length === 0 ? (
+                    <div className="flex-1 flex items-center justify-center text-xs text-[#6e6e73] py-6">
+                      {hoveredBucket === 'GOOD_UX'
+                        ? 'Release to place in Good UX'
+                        : 'Drop Good UX specimens here'}
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5">
+                      {goodUxSpecimens.map((spec) => {
+                        const isPicked = activeDragId === spec.id
+                        return (
+                          <div
+                            key={spec.id}
+                            ref={registerCardRef(spec.id)}
+                            onPointerDown={(e) => startDrag(e, spec.id)}
+                            onPointerMove={handleSpecularMove}
+                            className={`rounded-2xl p-3 bg-white/92 border border-[#0071e3]/25 shadow-2xs space-y-2 cursor-grab active:cursor-grabbing touch-none liquid-specular liquid-transition ${
+                              isPicked ? 'opacity-30 scale-[0.98]' : ''
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-semibold text-[#1d1d1f]">
+                                {spec.title}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => assignCategory(spec.id, null)}
+                                className="w-5 h-5 rounded-full bg-black/[0.05] hover:bg-black/10 text-[#515154] flex items-center justify-center liquid-press"
+                                aria-label={`Remove ${spec.title}`}
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </div>
+                            <AuditSpecimenVisual visualKey={spec.visualKey} />
+                          </div>
+                        )
+                      })}
+                    </div>
+                  )}
                 </div>
 
-                {aiSlopSpecimens.length === 0 ? (
-                  <div className="flex-1 flex items-center justify-center text-xs text-[#6e6e73] py-8">
-                    {hoveredBucket === 'AI_SLOP'
-                      ? 'Release to place in AI Slop UI'
-                      : 'Drop AI Slop UI specimens here'}
+                {/* AI Slop Bucket */}
+                <div
+                  data-audit-bucket="AI_SLOP"
+                  className={`rounded-2xl p-4 border-2 min-h-[175px] backdrop-blur-xl liquid-transition flex flex-col space-y-3 ${
+                    hoveredBucket === 'AI_SLOP'
+                      ? 'border-[#1d1d1f] bg-white/85 shadow-[inset_0_2px_14px_rgba(15,23,42,0.08)]'
+                      : 'border-dashed border-black/20 bg-white/55'
+                  }`}
+                >
+                  <div className="flex items-center justify-between">
+                    <div>
+                      <h2 className="text-sm font-semibold text-[#1d1d1f]">AI Slop UI</h2>
+                      <p className="text-[11px] text-[#515154]">
+                        Gratuitous glows/gradients, hype copy, vague or hidden UX
+                      </p>
+                    </div>
+                    <span className="text-xs font-semibold text-[#1d1d1f] bg-black/[0.07] px-2.5 py-0.5 rounded-full tabular-nums">
+                      {aiSlopSpecimens.length}
+                    </span>
                   </div>
-                ) : (
-                  <div className="space-y-2.5">
-                    {aiSlopSpecimens.map((spec) => {
-                      const isPicked = activeDragId === spec.id
-                      return (
-                        <div
-                          key={spec.id}
-                          ref={registerCardRef(spec.id)}
-                          onPointerDown={(e) => startDrag(e, spec.id)}
-                          onPointerMove={handleSpecularMove}
-                          className={`rounded-2xl p-3 bg-white/92 border border-black/[0.15] shadow-2xs space-y-2 cursor-grab active:cursor-grabbing touch-none liquid-specular liquid-transition ${
-                            isPicked ? 'opacity-30 scale-[0.98]' : ''
-                          }`}
-                        >
-                          <div className="flex items-center justify-between">
-                            <span className="text-xs font-semibold text-[#1d1d1f]">
-                              {spec.title}
-                            </span>
-                            <button
-                              type="button"
-                              onClick={() => assignCategory(spec.id, null)}
-                              className="w-5 h-5 rounded-full bg-black/[0.05] hover:bg-black/10 text-[#515154] flex items-center justify-center liquid-press"
-                              aria-label={`Remove ${spec.title}`}
-                            >
-                              <X className="w-3 h-3" />
-                            </button>
+
+                  {aiSlopSpecimens.length === 0 ? (
+                    <div className="flex-1 flex items-center justify-center text-xs text-[#6e6e73] py-6">
+                      {hoveredBucket === 'AI_SLOP'
+                        ? 'Release to place in AI Slop UI'
+                        : 'Drop AI Slop UI specimens here'}
+                    </div>
+                  ) : (
+                    <div className="space-y-2.5">
+                      {aiSlopSpecimens.map((spec) => {
+                        const isPicked = activeDragId === spec.id
+                        return (
+                          <div
+                            key={spec.id}
+                            ref={registerCardRef(spec.id)}
+                            onPointerDown={(e) => startDrag(e, spec.id)}
+                            onPointerMove={handleSpecularMove}
+                            className={`rounded-2xl p-3 bg-white/92 border border-black/[0.15] shadow-2xs space-y-2 cursor-grab active:cursor-grabbing touch-none liquid-specular liquid-transition ${
+                              isPicked ? 'opacity-30 scale-[0.98]' : ''
+                            }`}
+                          >
+                            <div className="flex items-center justify-between">
+                              <span className="text-xs font-semibold text-[#1d1d1f]">
+                                {spec.title}
+                              </span>
+                              <button
+                                type="button"
+                                onClick={() => assignCategory(spec.id, null)}
+                                className="w-5 h-5 rounded-full bg-black/[0.05] hover:bg-black/10 text-[#515154] flex items-center justify-center liquid-press"
+                                aria-label={`Remove ${spec.title}`}
+                              >
+                                <X className="w-3 h-3" />
+                              </button>
+                            </div>
+                            <AuditSpecimenVisual visualKey={spec.visualKey} />
                           </div>
-                          <AuditSpecimenVisual visualKey={spec.visualKey} />
-                        </div>
-                      )
-                    })}
-                  </div>
-                )}
+                        )
+                      })}
+                    </div>
+                  )}
+                </div>
               </div>
             </div>
 
