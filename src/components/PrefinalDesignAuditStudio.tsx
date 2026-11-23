@@ -26,7 +26,16 @@ import {
 interface Props {
   studentName: string
   violationCount: number
+  initialScreen?: '1' | '2'
+  initialClassifications?: Record<string, UxAuditCategory>
+  initialPrincipleAnswers?: Record<string, string>
   onScoreChange: (score: number) => void
+  onDraftChange?: (state: {
+    screen: '1' | '2'
+    classifications: Record<string, UxAuditCategory>
+    principleAnswers: Record<string, string>
+    score: number
+  }) => void
   onComplete: (finalPart2Score: number) => void
 }
 
@@ -49,13 +58,21 @@ type ScreenId = '1' | '2'
 export function PrefinalDesignAuditStudio({
   studentName,
   violationCount,
+  initialScreen = '1',
+  initialClassifications,
+  initialPrincipleAnswers,
   onScoreChange,
+  onDraftChange,
   onComplete
 }: Props) {
-  const [screen, setScreen] = useState<ScreenId>('1')
+  const [screen, setScreen] = useState<ScreenId>(initialScreen)
   const [screenDir, setScreenDir] = useState<1 | -1>(1)
-  const [classifications, setClassifications] = useState<Record<string, UxAuditCategory>>({})
-  const [principleAnswers, setPrincipleAnswers] = useState<Record<string, string>>({})
+  const [classifications, setClassifications] = useState<Record<string, UxAuditCategory>>(
+    () => initialClassifications || {}
+  )
+  const [principleAnswers, setPrincipleAnswers] = useState<Record<string, string>>(
+    () => initialPrincipleAnswers || {}
+  )
 
   // Drag React state only changes on drag start/end or bucket entry (never per pixel!)
   const [pointerActive, setPointerActive] = useState(false)
@@ -78,9 +95,17 @@ export function PrefinalDesignAuditStudio({
     return map
   }, [])
 
+  const firstMountRef = useRef(true)
+
   useEffect(() => {
-    onScoreChange(scorePrefinalDesignAudit(classifications, principleAnswers))
-  }, [classifications, principleAnswers, onScoreChange])
+    const score = scorePrefinalDesignAudit(classifications, principleAnswers)
+    onScoreChange(score)
+    if (firstMountRef.current) {
+      firstMountRef.current = false
+      return
+    }
+    onDraftChange?.({ screen, classifications, principleAnswers, score })
+  }, [screen, classifications, principleAnswers, onScoreChange, onDraftChange])
 
   const switchScreen = useCallback(
     (next: ScreenId) => {

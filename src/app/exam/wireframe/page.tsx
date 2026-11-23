@@ -7,7 +7,16 @@ import {
   scoreWireframePlacements
 } from '@/data/midtermQuestions'
 import { PrefinalDesignAuditStudio } from '@/components/PrefinalDesignAuditStudio'
+import { UxAuditCategory } from '@/data/prefinalQuestions'
 import { DraggableUIElement, ExamType, shuffleArray } from '@/lib/examUtils'
+import {
+  cancelScheduledCloudDraftSync,
+  hydrateSessionFromLocalDraft,
+  loadLocalDraft,
+  saveLocalDraft,
+  scheduleCloudDraftSync,
+  syncDraftToCloud
+} from '@/lib/examDraft'
 import { useAntiCheat } from '@/hooks/useAntiCheat'
 import {
   AlertCircle,
@@ -46,6 +55,11 @@ export default function WireframeExamPage() {
 
   const snapTimerRef = useRef<number | null>(null)
   const prefinalScoreRef = useRef(0)
+  const [initialPart2Draft, setInitialPart2Draft] = useState<{
+    screen: '1' | '2'
+    classifications: Record<string, UxAuditCategory>
+    principleAnswers: Record<string, string>
+  } | null>(null)
 
   const challenges = midtermWireframeChallenges
 
@@ -59,23 +73,94 @@ export default function WireframeExamPage() {
     sessionStorage.setItem('exam_part2_score', part2Score.toString())
     sessionStorage.setItem('exam_score', combinedScore.toString())
     sessionStorage.setItem('exam_forced_submit', 'true')
+    const draft = saveLocalDraft({ part2Score })
+    void syncDraftToCloud(draft, { keepalive: true })
     router.push('/result')
   }, [examType, placements, router])
 
   const { violationCount } = useAntiCheat(3, handleAutoSubmit)
 
   useEffect(() => {
+    const draft = hydrateSessionFromLocalDraft()
     const studentName = sessionStorage.getItem('exam_student_name')
     if (!studentName) {
       router.push('/')
       return
     }
     const storedType = (sessionStorage.getItem('exam_type') as ExamType) || 'PREFINAL'
+    const restoredChallengeIdx =
+      draft?.examType === storedType && typeof draft.wireframeChallengeIndex === 'number'
+        ? Math.min(Math.max(draft.wireframeChallengeIndex, 0), challenges.length - 1)
+        : 0
+    const restoredPlacements =
+      draft?.examType === storedType && draft.wireframePlacements ? draft.wireframePlacements : {}
+    const restoredPart2 = {
+      screen: (draft?.part2Screen || '1') as '1' | '2',
+      classifications: draft?.classifications || {},
+      principleAnswers: draft?.principleAnswers || {}
+    }
+
+    const updated = saveLocalDraft({ stage: '/exam/wireframe', examType: storedType })
+    void syncDraftToCloud(updated)
+
     Promise.resolve().then(() => {
       setName(studentName)
       setExamType(storedType)
+      setChallengeIndex(restoredChallengeIdx)
+      setPlacements(restoredPlacements)
+      setInitialPart2Draft(restoredPart2)
     })
-  }, [router])
+  }, [challenges.length, router])
+
+  useEffect(() => {
+    if (!name) return
+    const flushCloud = () => {
+      void syncDraftToCloud(loadLocalDraft(), { keepalive: true })
+    }
+    window.addEventListener('pagehide', flushCloud)
+    window.addEventListener('beforeunload', flushCloud)
+    return () => {
+      window.removeEventListener('pagehide', flushCloud)
+      window.removeEventListener('beforeunload', flushCloud)
+    }
+  }, [name])
+
+  useEffect(() => {
+    if (!name || examType === 'PREFINAL') return
+    const currentScore = scoreWireframePlacements(placements)
+    saveLocalDraft({
+      stage: '/exam/wireframe',
+      wireframeChallengeIndex: challengeIndex,
+      wireframePlacements: placements,
+      part2Score: currentScore,
+      violationCount
+    })
+    scheduleCloudDraftSync(() => loadLocalDraft(), 900)
+  }, [name, examType, challengeIndex, placements, violationCount])
+
+  const handlePrefinalDraftChange = useCallback(
+    (state: {
+      screen: '1' | '2'
+      classifications: Record<string, UxAuditCategory>
+      principleAnswers: Record<string, string>
+      score: number
+    }) => {
+      saveLocalDraft({
+        stage: '/exam/wireframe',
+        part2Screen: state.screen,
+        classifications: state.classifications,
+        principleAnswers: state.principleAnswers,
+        part2Score: state.score,
+        violationCount
+      })
+      scheduleCloudDraftSync(() => loadLocalDraft(), 900)
+    },
+    [violationCount]
+  )
+
+  const handlePrefinalScoreChange = useCallback((s: number) => {
+    prefinalScoreRef.current = s
+  }, [])
 
   const shuffledPalettes = useMemo(() => {
     const map: Record<string, DraggableUIElement[]> = {}
@@ -227,15 +312,24 @@ export default function WireframeExamPage() {
       <PrefinalDesignAuditStudio
         studentName={name}
         violationCount={violationCount}
-        onScoreChange={(s) => {
-          prefinalScoreRef.current = s
-        }}
+        initialScreen={initialPart2Draft?.screen || '1'}
+        initialClassifications={initialPart2Draft?.classifications}
+        initialPrincipleAnswers={initialPart2Draft?.principleAnswers}
+        onScoreChange={handlePrefinalScoreChange}
+        onDraftChange={handlePrefinalDraftChange}
         onComplete={(part2Score) => {
+          cancelScheduledCloudDraftSync()
           const part1Score = parseInt(sessionStorage.getItem('exam_part1_score') || '0', 10)
           const combinedObjectiveScore = part1Score + part2Score
           sessionStorage.setItem('exam_part2_score', part2Score.toString())
           sessionStorage.setItem('exam_score', combinedObjectiveScore.toString())
           sessionStorage.setItem('exam_violation_count', violationCount.toString())
+          const nextDraft = saveLocalDraft({
+            stage: '/exam/essay',
+            part2Score,
+            violationCount
+          })
+          void syncDraftToCloud(nextDraft, { keepalive: true })
           router.push('/exam/essay')
         }}
       />
@@ -304,9 +398,16 @@ export default function WireframeExamPage() {
       const part2Score = scoreWireframePlacements(placements)
       const combinedObjectiveScore = part1Score + part2Score
 
+      cancelScheduledCloudDraftSync()
       sessionStorage.setItem('exam_part2_score', part2Score.toString())
       sessionStorage.setItem('exam_score', combinedObjectiveScore.toString())
       sessionStorage.setItem('exam_violation_count', violationCount.toString())
+      const nextDraft = saveLocalDraft({
+        stage: '/exam/essay',
+        part2Score,
+        violationCount
+      })
+      void syncDraftToCloud(nextDraft, { keepalive: true })
 
       router.push('/exam/essay')
     }

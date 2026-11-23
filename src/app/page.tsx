@@ -13,7 +13,16 @@ import {
 } from 'lucide-react'
 import Link from 'next/link'
 import { supabase } from '@/lib/supabase'
-import { ExamType, getExamType } from '@/lib/examUtils'
+import { ExamType, getExamType, isDraftRecord } from '@/lib/examUtils'
+import {
+  ExamDraftState,
+  formatDraftSummary,
+  loadLocalDraft,
+  parseCloudDraft,
+  pickNewestDraft,
+  saveLocalDraft,
+  syncSessionKeysFromDraft
+} from '@/lib/examDraft'
 import { SkyCloudBackdrop } from '@/components/SkyCloudBackdrop'
 import { LiquidSegmentedControl, handleSpecularMove } from '@/components/LiquidSegmentedControl'
 
@@ -58,10 +67,12 @@ export default function Onboarding() {
   const [selectedExamType, setSelectedExamType] = useState<ExamType>('PREFINAL')
 
   const [allRecords, setAllRecords] = useState<StudentExamRecord[]>([])
+  const [localDraft, setLocalDraft] = useState<ExamDraftState | null>(null)
   const [loadingRecords, setLoadingRecords] = useState(true)
   const [errorMsg, setErrorMsg] = useState('')
 
   useEffect(() => {
+    Promise.resolve().then(() => setLocalDraft(loadLocalDraft()))
     const fetchStudents = async () => {
       try {
         setLoadingRecords(true)
@@ -100,7 +111,7 @@ export default function Onboarding() {
     >()
 
     for (const row of allRecords) {
-      if (row.section !== section) continue
+      if (row.section !== section || isDraftRecord(row)) continue
       const upperName = row.student_name.trim().toUpperCase()
       const current = map.get(upperName) || {
         name: upperName,
@@ -153,7 +164,8 @@ export default function Onboarding() {
         midtermScore: null,
         hasPrefinal: false,
         prefinalScore: null,
-        registeredEmail: null as string | null
+        registeredEmail: null as string | null,
+        cloudDraft: null as ExamDraftState | null
       }
     }
 
@@ -164,15 +176,26 @@ export default function Onboarding() {
     let hasPrefinal = false
     let prefinalScore: number | null = null
     let registeredEmail: string | null = null
+    let cloudDraft: ExamDraftState | null = null
 
     for (const row of allRecords) {
       if (row.student_name.trim().toUpperCase() === activeStudentName) {
-        const total = (row.mcq_score || 0) + (row.ai_score || 0)
         const emailMatch = row.essay_answer?.match(/\|EMAIL:([^|\]]+)/i)
         if (emailMatch) {
           registeredEmail = emailMatch[1].toLowerCase()
         }
 
+        if (isDraftRecord(row)) {
+          if (getExamType(row) === 'PREFINAL') {
+            const parsedDraft = parseCloudDraft(row)
+            if (parsedDraft && (!cloudDraft || parsedDraft.updatedAt > cloudDraft.updatedAt)) {
+              cloudDraft = parsedDraft
+            }
+          }
+          continue
+        }
+
+        const total = (row.mcq_score || 0) + (row.ai_score || 0)
         const period = getExamType(row)
         if (period === 'PREFINAL') {
           hasPrefinal = true
@@ -194,9 +217,15 @@ export default function Onboarding() {
       midtermScore,
       hasPrefinal,
       prefinalScore,
-      registeredEmail
+      registeredEmail,
+      cloudDraft
     }
   }, [allRecords, activeStudentName])
+
+  const resumeDraft = useMemo(() => {
+    if (!activeStudentName || studentStatus.hasPrefinal) return null
+    return pickNewestDraft(localDraft, studentStatus.cloudDraft, activeStudentName, 'PREFINAL')
+  }, [activeStudentName, localDraft, studentStatus.cloudDraft, studentStatus.hasPrefinal])
 
   const handleSendOtp = async () => {
     setErrorMsg('')
@@ -303,6 +332,32 @@ export default function Onboarding() {
       return
     }
 
+    if (resumeDraft) {
+      const merged = saveLocalDraft({
+        ...resumeDraft,
+        studentName: activeStudentName,
+        email: cleanLowerEmail || resumeDraft.email,
+        section: section || resumeDraft.section,
+        examType: 'PREFINAL'
+      })
+      if (merged) {
+        syncSessionKeysFromDraft(merged)
+      }
+      sessionStorage.removeItem('exam_forced_submit')
+      sessionStorage.removeItem('exam_essay_answer')
+
+      try {
+        if (document.documentElement.requestFullscreen) {
+          document.documentElement.requestFullscreen().catch(() => {})
+        }
+      } catch (err) {
+        console.warn('Fullscreen request failed', err)
+      }
+
+      router.push(resumeDraft.stage)
+      return
+    }
+
     sessionStorage.setItem('exam_student_name', activeStudentName)
     sessionStorage.setItem('exam_student_email', cleanLowerEmail)
     sessionStorage.setItem('exam_section', section)
@@ -314,6 +369,18 @@ export default function Onboarding() {
     sessionStorage.removeItem('exam_forced_submit')
     sessionStorage.removeItem('exam_essay_answer')
     sessionStorage.removeItem('exam_is_essay_pasted')
+
+    saveLocalDraft({
+      studentName: activeStudentName,
+      email: cleanLowerEmail,
+      section,
+      examType: selectedExamType,
+      stage: '/exam',
+      part1Score: 0,
+      part2Score: 0,
+      violationCount: 0,
+      part1Index: 0
+    })
 
     try {
       if (document.documentElement.requestFullscreen) {
@@ -690,12 +757,21 @@ export default function Onboarding() {
                 <div className="mt-4 pt-2 border-t border-current/15 text-[11px] font-medium tabular-nums">
                   {studentStatus.hasPrefinal
                     ? `Done (${studentStatus.prefinalScore}/50)`
+                    : resumeDraft
+                    ? 'Saved in progress'
                     : selectedExamType === 'PREFINAL'
                     ? 'Selected'
                     : 'Select'}
                 </div>
               </button>
             </div>
+
+            {resumeDraft && (
+              <div className="px-3.5 py-2 rounded-xl bg-[#0071e3]/[0.08] border border-[#0071e3]/20 text-xs text-[#1d1d1f] flex items-center justify-between gap-2">
+                <span className="font-medium text-[#0071e3]">Saved progress found</span>
+                <span className="text-[#515154] tabular-nums">{formatDraftSummary(resumeDraft)}</span>
+              </div>
+            )}
 
             <div className="flex items-center gap-2 pt-1">
               <button
@@ -716,7 +792,7 @@ export default function Onboarding() {
                 disabled={selectedExamType !== 'PREFINAL' || studentStatus.hasPrefinal}
                 className="flex-1 flex items-center justify-center space-x-1.5 py-2.5 px-4 bg-[#1d1d1f] text-white rounded-xl text-xs font-semibold hover:bg-black/85 disabled:bg-black/10 disabled:text-[#6e6e73] liquid-press shadow-xs"
               >
-                <span>Start Pre-Final Exam</span>
+                <span>{resumeDraft ? 'Resume Pre-Final Exam' : 'Start Pre-Final Exam'}</span>
                 <ChevronRight className="w-3.5 h-3.5" />
               </button>
             </div>

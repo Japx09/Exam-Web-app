@@ -81,11 +81,21 @@ export function scoreChallenges(
   return score
 }
 
+export function isDraftRecord(exam: { essay_answer?: string | null }): boolean {
+  return Boolean(exam?.essay_answer?.startsWith('[DRAFT:'))
+}
+
 export function getExamType(exam: { essay_answer?: string | null; section?: string | null }): ExamType {
   if (!exam) return 'PRELIM'
   const essay = exam.essay_answer || ''
-  if (essay.startsWith('[EXAM:PREFINAL')) return 'PREFINAL'
-  if (essay.startsWith('[EXAM:MIDTERM') || exam.section?.toUpperCase().includes('MIDTERM')) return 'MIDTERM'
+  if (essay.startsWith('[EXAM:PREFINAL') || essay.startsWith('[DRAFT:PREFINAL')) return 'PREFINAL'
+  if (
+    essay.startsWith('[EXAM:MIDTERM') ||
+    essay.startsWith('[DRAFT:MIDTERM') ||
+    exam.section?.toUpperCase().includes('MIDTERM')
+  ) {
+    return 'MIDTERM'
+  }
   return 'PRELIM'
 }
 

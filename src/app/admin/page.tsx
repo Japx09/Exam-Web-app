@@ -24,6 +24,7 @@ import {
 import {
   ExamType,
   getExamType,
+  isDraftRecord,
   parseExamDetails,
   WireframeDndChallenge,
   DraggableUIElement
@@ -161,8 +162,24 @@ export default function AdminDashboard() {
 
     const channel = supabase
       .channel('public:exams')
-      .on('postgres_changes', { event: 'INSERT', schema: 'public', table: 'exams' }, (payload) => {
-        setExams((current) => [payload.new as ExamRow, ...current])
+      .on('postgres_changes', { event: '*', schema: 'public', table: 'exams' }, (payload) => {
+        if (payload.eventType === 'INSERT') {
+          const next = payload.new as ExamRow
+          setExams((current) => [next, ...current.filter((item) => item.id !== next.id)])
+        } else if (payload.eventType === 'UPDATE') {
+          const updated = payload.new as ExamRow
+          setExams((current) => {
+            const exists = current.some((item) => item.id === updated.id)
+            return exists
+              ? current.map((item) => (item.id === updated.id ? updated : item))
+              : [updated, ...current]
+          })
+        } else if (payload.eventType === 'DELETE') {
+          const oldId = (payload.old as { id?: string } | null)?.id
+          if (oldId) {
+            setExams((current) => current.filter((item) => item.id !== oldId))
+          }
+        }
       })
       .subscribe()
 
@@ -300,7 +317,7 @@ export default function AdminDashboard() {
                     : 'text-[#515154] hover:text-[#1d1d1f]'
                 }`}
               >
-                Records ({exams.length})
+                Records ({exams.filter((e) => !isDraftRecord(e)).length})
               </button>
               <button
                 onClick={() => setAdminView('otp')}
@@ -631,7 +648,7 @@ export default function AdminDashboard() {
 
               {['BSIT 2-A', 'BSIT 2-B'].map((section) => {
                 const sectionExams = exams.filter((e) => {
-                  if (e.section !== section) return false
+                  if (isDraftRecord(e) || e.section !== section) return false
                   if (examFilter === 'ALL') return true
                   return getExamType(e) === examFilter
                 })

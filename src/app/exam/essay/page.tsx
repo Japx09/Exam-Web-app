@@ -8,6 +8,14 @@ import { essayQuestion } from '@/data/questions'
 import { midtermEssays, formatMidtermEssayAnswer } from '@/data/midtermQuestions'
 import { prefinalEssays, formatPrefinalEssayAnswer } from '@/data/prefinalQuestions'
 import { ExamType } from '@/lib/examUtils'
+import {
+  cancelScheduledCloudDraftSync,
+  hydrateSessionFromLocalDraft,
+  loadLocalDraft,
+  saveLocalDraft,
+  scheduleCloudDraftSync,
+  syncDraftToCloud
+} from '@/lib/examDraft'
 
 export default function EssayPage() {
   const router = useRouter()
@@ -20,6 +28,7 @@ export default function EssayPage() {
 
   const [isPasted, setIsPasted] = useState(false)
   const [showToast, setShowToast] = useState(false)
+  const [draftReady, setDraftReady] = useState(false)
 
   const isMultiPart = examType === 'MIDTERM' || examType === 'PREFINAL'
   const activeEssays = examType === 'PREFINAL' ? prefinalEssays : midtermEssays
@@ -40,26 +49,76 @@ export default function EssayPage() {
   }, [essay, essay1, essay2, examType])
 
   const handleAutoSubmit = useCallback(() => {
+    cancelScheduledCloudDraftSync()
     sessionStorage.setItem('exam_forced_submit', 'true')
     sessionStorage.setItem('exam_essay_answer', buildFinalEssayString())
     sessionStorage.setItem('exam_is_essay_pasted', isPasted.toString())
+    const saved = saveLocalDraft({
+      stage: '/exam/essay',
+      essay,
+      essay1,
+      essay2,
+      isEssayPasted: isPasted
+    })
+    void syncDraftToCloud(saved, { keepalive: true })
     router.push('/result')
-  }, [buildFinalEssayString, isPasted, router])
+  }, [buildFinalEssayString, essay, essay1, essay2, isPasted, router])
 
   const { violationCount } = useAntiCheat(3, handleAutoSubmit)
 
   useEffect(() => {
+    const draft = hydrateSessionFromLocalDraft()
     const studentName = sessionStorage.getItem('exam_student_name')
     if (!studentName) {
       router.push('/')
       return
     }
     const storedType = (sessionStorage.getItem('exam_type') as ExamType) || 'PREFINAL'
+    const restoredEssay = draft?.examType === storedType ? draft.essay || '' : ''
+    const restoredEssay1 = draft?.examType === storedType ? draft.essay1 || '' : ''
+    const restoredEssay2 = draft?.examType === storedType ? draft.essay2 || '' : ''
+    const restoredPasted =
+      draft?.examType === storedType ? Boolean(draft.isEssayPasted) : false
+
+    const synced = saveLocalDraft({ stage: '/exam/essay', examType: storedType })
+    void syncDraftToCloud(synced)
+
     Promise.resolve().then(() => {
       setName(studentName)
       setExamType(storedType)
+      setEssay(restoredEssay)
+      setEssay1(restoredEssay1)
+      setEssay2(restoredEssay2)
+      setIsPasted(restoredPasted)
+      setDraftReady(true)
     })
   }, [router])
+
+  useEffect(() => {
+    if (!draftReady || !name) return
+    saveLocalDraft({
+      stage: '/exam/essay',
+      essay,
+      essay1,
+      essay2,
+      isEssayPasted: isPasted,
+      violationCount
+    })
+    scheduleCloudDraftSync(() => loadLocalDraft(), 1200)
+  }, [draftReady, name, essay, essay1, essay2, isPasted, violationCount])
+
+  useEffect(() => {
+    if (!name) return
+    const flushCloud = () => {
+      void syncDraftToCloud(loadLocalDraft(), { keepalive: true })
+    }
+    window.addEventListener('pagehide', flushCloud)
+    window.addEventListener('beforeunload', flushCloud)
+    return () => {
+      window.removeEventListener('pagehide', flushCloud)
+      window.removeEventListener('beforeunload', flushCloud)
+    }
+  }, [name])
 
   const handlePaste = (e: React.ClipboardEvent<HTMLTextAreaElement>) => {
     e.preventDefault()
@@ -76,9 +135,18 @@ export default function EssayPage() {
 
   const handleSubmit = () => {
     if (!canSubmit) return
+    cancelScheduledCloudDraftSync()
     sessionStorage.setItem('exam_essay_answer', buildFinalEssayString())
     sessionStorage.setItem('exam_is_essay_pasted', isPasted.toString())
     sessionStorage.setItem('exam_violation_count', violationCount.toString())
+    saveLocalDraft({
+      stage: '/exam/essay',
+      essay,
+      essay1,
+      essay2,
+      isEssayPasted: isPasted,
+      violationCount
+    })
     router.push('/result')
   }
 
@@ -114,6 +182,9 @@ export default function EssayPage() {
             </span>
           </div>
           <div className="flex items-center space-x-2">
+            <span className="text-[11px] font-medium text-[#515154] hidden sm:inline">
+              Auto-saved
+            </span>
             {violationCount > 0 && (
               <span className="inline-flex items-center space-x-1 rounded-lg bg-red-500/10 border border-red-500/20 px-2 py-0.5 text-xs font-medium text-red-700 tabular-nums">
                 <AlertCircle className="w-3 h-3" />

@@ -8,6 +8,7 @@ import { essayQuestion } from '@/data/questions'
 import { midtermCombinedEssayPromptForAI } from '@/data/midtermQuestions'
 import { prefinalCombinedEssayPromptForAI } from '@/data/prefinalQuestions'
 import { ExamType } from '@/lib/examUtils'
+import { clearExamDraft, hydrateSessionFromLocalDraft, loadLocalDraft } from '@/lib/examDraft'
 import type { Database } from '@/types/database'
 
 type ExamInsert = Database['public']['Tables']['exams']['Insert']
@@ -27,6 +28,7 @@ export default function ResultPage() {
     if (submittedRef.current) return
     submittedRef.current = true
 
+    hydrateSessionFromLocalDraft()
     const rawName = sessionStorage.getItem('exam_student_name')
     const section = sessionStorage.getItem('exam_section')
     const storedType = (sessionStorage.getItem('exam_type') as ExamType) || 'PREFINAL'
@@ -110,11 +112,39 @@ export default function ResultPage() {
           ai_feedback: aiFeedback
         }
 
-        const { error } = await supabase.from('exams').insert(payload as never)
+        const localDraft = loadLocalDraft()
+        let savedRowError: { message: string } | null = null
+        let convertedInPlace = false
 
-        if (error) {
-          console.error('Error submitting exam:', error)
-          alert(`Database Error: ${error.message}. Please show this to the admin.`)
+        if (localDraft?.cloudDraftId) {
+          const { data: updatedRows, error: updateError } = await supabase
+            .from('exams')
+            .update(payload as never)
+            .eq('id', localDraft.cloudDraftId)
+            .like('essay_answer', '[DRAFT:%')
+            .select('id')
+
+          if (!updateError && updatedRows && updatedRows.length > 0) {
+            convertedInPlace = true
+          }
+        }
+
+        if (!convertedInPlace) {
+          const { error: insertError } = await supabase.from('exams').insert(payload as never)
+          savedRowError = insertError
+        }
+
+        if (savedRowError) {
+          console.error('Error submitting exam:', savedRowError)
+          alert(`Database Error: ${savedRowError.message}. Please show this to the admin.`)
+        } else {
+          // Clean up any leftover cloud drafts and local auto-save once finalized
+          await supabase
+            .from('exams')
+            .delete()
+            .eq('student_name', studentName)
+            .like('essay_answer', `[DRAFT:${storedType}%`)
+          clearExamDraft()
         }
       } catch (err) {
         console.error('Unexpected error:', err)

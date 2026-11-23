@@ -9,7 +9,7 @@ import {
   AlertCircle
 } from 'lucide-react'
 import { supabase } from '@/lib/supabase'
-import { ExamType, parseExamDetails } from '@/lib/examUtils'
+import { ExamType, isDraftRecord, parseExamDetails } from '@/lib/examUtils'
 import { LiquidSegmentedControl } from '@/components/LiquidSegmentedControl'
 import Link from 'next/link'
 
@@ -78,8 +78,10 @@ export default function ViewScore() {
     }
   }, [fetchScores])
 
+  const submittedExams = useMemo(() => exams.filter((e) => !isDraftRecord(e)), [exams])
+
   const filteredAndSortedExams = useMemo(() => {
-    return exams
+    return submittedExams
       .filter((exam) => {
         const details = parseExamDetails(exam)
         const matchesTab = activeTab === 'ALL' || exam.section === activeTab
@@ -107,26 +109,26 @@ export default function ViewScore() {
             return nameA.localeCompare(nameB)
         }
       })
-  }, [exams, activeTab, examPeriodFilter, searchQuery, sortBy])
+  }, [submittedExams, activeTab, examPeriodFilter, searchQuery, sortBy])
 
   const countSectionA = useMemo(
     () =>
-      exams.filter(
+      submittedExams.filter(
         (e) =>
           e.section === 'BSIT 2-A' &&
           (examPeriodFilter === 'ALL' || parseExamDetails(e).examType === examPeriodFilter)
       ).length,
-    [exams, examPeriodFilter]
+    [submittedExams, examPeriodFilter]
   )
 
   const countSectionB = useMemo(
     () =>
-      exams.filter(
+      submittedExams.filter(
         (e) =>
           e.section === 'BSIT 2-B' &&
           (examPeriodFilter === 'ALL' || parseExamDetails(e).examType === examPeriodFilter)
       ).length,
-    [exams, examPeriodFilter]
+    [submittedExams, examPeriodFilter]
   )
 
   const toggleRow = (id: string) => {

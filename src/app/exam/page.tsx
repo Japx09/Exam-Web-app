@@ -6,6 +6,12 @@ import { questions as prelimQuestions } from '@/data/questions'
 import { midtermMCQs } from '@/data/midtermQuestions'
 import { prefinalMCQs } from '@/data/prefinalQuestions'
 import { ActiveQuestion, ExamType, shuffleArray } from '@/lib/examUtils'
+import {
+  hydrateSessionFromLocalDraft,
+  loadLocalDraft,
+  saveLocalDraft,
+  syncDraftToCloud
+} from '@/lib/examDraft'
 import { handleSpecularMove } from '@/components/LiquidSegmentedControl'
 import { useAntiCheat } from '@/hooks/useAntiCheat'
 import { AlertCircle, Clock, ChevronRight } from 'lucide-react'
@@ -24,12 +30,15 @@ export default function ExamPage() {
     sessionStorage.setItem('exam_score', score.toString())
     sessionStorage.setItem('exam_part1_score', score.toString())
     sessionStorage.setItem('exam_forced_submit', 'true')
+    const draft = saveLocalDraft({ part1Score: score, part1Index: currentIndex })
+    void syncDraftToCloud(draft, { keepalive: true })
     router.push('/result')
-  }, [router, score])
+  }, [currentIndex, router, score])
 
   const { violationCount } = useAntiCheat(3, handleAutoSubmit)
 
   useEffect(() => {
+    const draft = hydrateSessionFromLocalDraft()
     const studentName = sessionStorage.getItem('exam_student_name')
     if (!studentName) {
       router.push('/')
@@ -43,19 +52,94 @@ export default function ExamPage() {
         ? midtermMCQs
         : prelimQuestions
 
-    const shuffled = shuffleArray(sourceQuestions).map((q) => ({
-      ...q,
-      options: shuffleArray(q.options)
-    }))
-    const savedScore = parseInt(sessionStorage.getItem('exam_score') || '0', 10)
+    let orderedQuestions: ActiveQuestion[]
+    const savedIds = draft?.examType === storedType ? draft.part1QuestionIds : undefined
+    if (savedIds && savedIds.length > 0) {
+      const byId = new Map(sourceQuestions.map((q) => [q.id, q]))
+      const seen = new Set<number>()
+      const restored: ActiveQuestion[] = []
+      for (const id of savedIds) {
+        const match = byId.get(id)
+        if (match && !seen.has(id)) {
+          seen.add(id)
+          restored.push({ ...match, options: shuffleArray(match.options) })
+        }
+      }
+      for (const q of sourceQuestions) {
+        if (!seen.has(q.id)) {
+          restored.push({ ...q, options: shuffleArray(q.options) })
+        }
+      }
+      orderedQuestions = restored
+    } else {
+      orderedQuestions = shuffleArray(sourceQuestions).map((q) => ({
+        ...q,
+        options: shuffleArray(q.options)
+      }))
+    }
+
+    const savedScore =
+      draft?.examType === storedType
+        ? draft.part1Score
+        : parseInt(sessionStorage.getItem('exam_part1_score') || sessionStorage.getItem('exam_score') || '0', 10)
+    const resumeIdx =
+      draft?.examType === storedType && typeof draft.part1Index === 'number'
+        ? Math.min(Math.max(draft.part1Index, 0), Math.max(orderedQuestions.length - 1, 0))
+        : 0
+    const resumeSelected = draft?.examType === storedType ? draft.part1SelectedOption ?? null : null
+    const resumeTimeLeft =
+      draft?.examType === storedType && typeof draft.part1TimeLeft === 'number' && draft.part1TimeLeft > 0
+        ? Math.max(10, Math.min(60, draft.part1TimeLeft))
+        : 60
+
+    if (!savedIds || savedIds.length === 0) {
+      const initial = saveLocalDraft({
+        stage: '/exam',
+        examType: storedType,
+        part1QuestionIds: orderedQuestions.map((q) => q.id),
+        part1Index: resumeIdx,
+        part1Score: savedScore,
+        part1SelectedOption: resumeSelected,
+        part1TimeLeft: resumeTimeLeft
+      })
+      void syncDraftToCloud(initial)
+    }
 
     Promise.resolve().then(() => {
       setName(studentName)
       setExamType(storedType)
-      setShuffledQuestions(shuffled)
+      setShuffledQuestions(orderedQuestions)
       setScore(savedScore)
+      setCurrentIndex(resumeIdx)
+      setSelectedOption(resumeSelected)
+      setTimeLeft(resumeTimeLeft)
     })
   }, [router])
+
+  useEffect(() => {
+    if (!name || shuffledQuestions.length === 0) return
+    const flushCloud = () => {
+      void syncDraftToCloud(loadLocalDraft(), { keepalive: true })
+    }
+    window.addEventListener('pagehide', flushCloud)
+    window.addEventListener('beforeunload', flushCloud)
+    return () => {
+      window.removeEventListener('pagehide', flushCloud)
+      window.removeEventListener('beforeunload', flushCloud)
+    }
+  }, [name, shuffledQuestions.length])
+
+  useEffect(() => {
+    if (!name || shuffledQuestions.length === 0) return
+    saveLocalDraft({
+      stage: '/exam',
+      part1Index: currentIndex,
+      part1Score: score,
+      part1SelectedOption: selectedOption,
+      part1TimeLeft: timeLeft,
+      violationCount
+    })
+  }, [name, shuffledQuestions.length, currentIndex, score, selectedOption, violationCount, timeLeft])
 
   const handleNext = useCallback(() => {
     if (!selectedOption && timeLeft > 0) return
@@ -71,16 +155,33 @@ export default function ExamPage() {
     }
 
     if (currentIndex < shuffledQuestions.length - 1) {
-      setCurrentIndex((prev) => prev + 1)
+      const nextIndex = currentIndex + 1
+      setCurrentIndex(nextIndex)
       setSelectedOption(null)
       setTimeLeft(60)
+      const saved = saveLocalDraft({
+        stage: '/exam',
+        part1Index: nextIndex,
+        part1Score: newScore,
+        part1SelectedOption: null,
+        part1TimeLeft: 60,
+        violationCount
+      })
+      void syncDraftToCloud(saved)
     } else {
       sessionStorage.setItem('exam_violation_count', violationCount.toString())
-      if (examType === 'MIDTERM' || examType === 'PREFINAL') {
-        router.push('/exam/wireframe')
-      } else {
-        router.push('/exam/essay')
-      }
+      const nextRoute =
+        examType === 'MIDTERM' || examType === 'PREFINAL' ? '/exam/wireframe' : '/exam/essay'
+      const completedPart1Draft = saveLocalDraft({
+        stage: nextRoute,
+        part1Index: shuffledQuestions.length,
+        part1Score: newScore,
+        part1SelectedOption: null,
+        part1TimeLeft: 60,
+        violationCount
+      })
+      void syncDraftToCloud(completedPart1Draft, { keepalive: true })
+      router.push(nextRoute)
     }
   }, [currentIndex, examType, router, score, selectedOption, shuffledQuestions, timeLeft, violationCount])
 
